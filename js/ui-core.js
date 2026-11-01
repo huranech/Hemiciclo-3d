@@ -178,7 +178,8 @@ function ideologyAxes(players, opts = {}) {
 // ---------- modales y avisos ----------
 function modal(title, content, actions, opts = {}) {
   const back = h('div', { class: 'modal-back' });
-  const close = () => back.remove();
+  let closed = false;
+  const close = () => { back.remove(); if (!closed) { closed = true; if (opts.onClose) opts.onClose(); } };
   back.addEventListener('click', e => { if (e.target === back && !opts.locked) close(); });
   back.appendChild(h('div', { class: 'modal glass' + (opts.wide ? ' wide' : ''), role: 'dialog', 'aria-label': title },
     h('div', { class: 'row' }, h('h2', null, title), h('span', { class: 'spacer' }), opts.locked ? null : btn('', close, { kind: 'ghost', size: 'sm', icon: 'x', title: 'Cerrar' })),

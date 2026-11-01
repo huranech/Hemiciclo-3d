@@ -683,3 +683,14 @@ body:not([data-scene=map]) #map-lod { display: none !important; }
 .ws-track .tick { position: absolute; top: 3px; bottom: 3px; width: 1px; background: var(--line-2); }
 .ws-dot { position: absolute; top: 50%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; border: 2px solid var(--bg); box-shadow: 0 0 0 1px rgba(255, 255, 255, .25); }
 .good-txt { color: var(--good); }
+
+/* misiones a la vista (fundación y debate) y aviso de remodelación */
+.missions-peek .mission{padding:10px 12px}
+.missions-peek .mission h3{font-size:14px;margin:2px 0}
+.missions-peek .mission .text{font-size:12.5px;margin:2px 0 0}
+.missions-peek .mission .cat{font-size:11px}
+.gov-draft{position:fixed;left:16px;bottom:84px;z-index:30;max-width:320px;padding:12px 14px;border-radius:14px}
+.gov-draft .min-list{margin-top:6px}
+.missions-peek .mission{min-height:0;height:auto;aspect-ratio:auto}
+.missions-peek .row h3{display:flex;align-items:center;gap:6px;margin:0;white-space:nowrap}
+.missions-peek .stack{gap:8px}

@@ -131,6 +131,18 @@ function phaseMissions() {
   };
 }
 
+// Tus misiones secretas, a la vista mientras moldeas tu partido (fundación y debate)
+function myMissionsPanel() {
+  const p = me();
+  if (!p || !p.missions || !p.missions.length) return null;
+  const open = UI.missOpen !== false;
+  return h('section', { class: 'card missions-peek' },
+    h('div', { class: 'row' }, h('h3', { class: 'grow' }, icon('eye-off', { size: 16 }), ' Tus misiones secretas'),
+      btn(open ? 'Ocultar' : 'Ver', () => { UI.missOpen = !open; render(); }, { kind: 'ghost', size: 'sm' })),
+    open ? h('div', { class: 'stack' }, p.missions.map(m => missionCard(m, { progress: false }))) : null,
+    open ? h('p', { class: 'muted small' }, 'Solo tú las ves. Úsalas para decidir qué ideología y qué respuestas encajan con tu partido.') : null);
+}
+
 // ---------- Fundación de partidos ----------
 function partyDraft() {
   const p = me();
@@ -183,7 +195,7 @@ function phaseParties() {
       h('div', { class: 'grid2 face-grid' }, faceKeys.map(faceCtl)),
       h('div', { class: 'btn-row sticky-actions' }, btn(p.configured ? 'Guardar cambios' : 'Registrar el partido', save, { kind: 'primary', icon: 'check' }),
         p.configured ? h('span', { class: 'muted small' }, 'Registrado. Pulsa «Listo» abajo cuando acabes.') : null)),
-    side: h('div', { class: 'dock right glass' }, h('h3', null, 'Así se verá'), partyPreviewCard(Object.assign({}, p, D, { configured: true })),
+    side: h('div', { class: 'dock right glass' }, myMissionsPanel(), h('h3', null, 'Así se verá'), partyPreviewCard(Object.assign({}, p, D, { configured: true })),
       h('h3', { style: { marginTop: '16px' } }, 'Partidos registrados'),
       h('div', { class: 'stack' }, V.players.filter(x => x.configured).map(x => h('div', { class: 'row' }, chip(x), h('span', { class: 'muted small' }, x.candidate.name)))),
       V.players.some(x => !x.configured) ? h('p', { class: 'muted small' }, 'Faltan: ' + V.players.filter(x => !x.configured).map(x => x.player).join(', ')) : null),
@@ -230,7 +242,7 @@ function phaseDebate() {
         regs.map(o => h('button', { type: 'button', class: 'answer reg', disabled: !mine, onclick: () => askConfirm(`¿Convertir ${mine ? 'tu partido' : 'el partido'} en regionalista de ${o.name}? Solo te presentarás en ${o.cantons.map(i => V.cantons[i].name).join(' y ')}. No se puede deshacer.`, 'Sí, ser regionalista', () => act({ type: 'debateAnswer', reg: o.cul }, { toast: false })) },
           h('span', { class: 'ans-t' }, o.t), h('span', { class: 'fx-row' }, h('span', { class: 'fx reg-tag' }, icon('map-pin', { size: 11 }), 'Regionalista de ' + o.label)), fxChips(o.fx, d.axis)))) : null,
       h('p', { class: 'muted small center' }, mine ? 'Elige tu respuesta. Las ya usadas en esta pregunta no se pueden repetir.' : `${sp.candidate.name} está pensando su respuesta…`)),
-    side: h('div', { class: 'dock right glass', 'data-sk': 'deb' }, regionalStatus(),
+    side: h('div', { class: 'dock right glass', 'data-sk': 'deb' }, myMissionsPanel(), regionalStatus(),
       log.length ? h('div', null, h('h3', null, 'Lo dicho en este bloque'), h('ul', { class: 'log' }, log.map(x => h('li', null, chip(P(x.party), { small: true, short: true }), h('div', null, x.t))))) : null),
   };
 }
@@ -347,21 +359,36 @@ function phaseInvResult() {
         h('tbody', null, V.players.filter(p => seatsV(p.id) > 0).map(p => h('tr', null, h('td', null, chip(p, { small: true, short: true })), r.tallies.map(t => { const v = r.votes[p.id][t.cand] || 'abs'; return h('td', { class: 'r vote-' + v }, { si: 'Sí', no: 'No', abs: 'Abst.' }[v]); }))))))),
   };
 }
+function draftList(map, pres) {
+  return h('div', { class: 'min-list' }, MINISTRIES.map(m => h('div', { class: 'min-mini', title: m.power }, icon(m.icon, { size: 16 }), h('span', null, m.name), chip(P((map || {})[m.id] || pres.id), { small: true, short: true, none: '—' }))));
+}
 function phaseMinistries() {
   const pres = P(V.gov.president);
   if (V.gov.president !== V.me) {
+    const dr = V.gov.draft && V.gov.draft.kind === 'ministries' ? V.gov.draft : null;
     return { side: h('div', { class: 'dock right glass' }, h('h2', null, 'Formación de gobierno'), portrait(pres, 90), h('p', null, `${pres.candidate.name} está eligiendo a su Consejo de Ministros.`),
-      V.gov.supporters.length ? h('p', { class: 'muted small' }, 'Puede dar carteras a quienes votaron su investidura: ' + V.gov.supporters.map(id => P(id).short).join(', ') + '.') : h('p', { class: 'muted small' }, 'Nadie más votó su investidura: gobernará en solitario.')) };
+      V.gov.supporters.length ? h('p', { class: 'muted small' }, 'Puede dar carteras a quienes votaron su investidura: ' + V.gov.supporters.map(id => P(id).short).join(', ') + '.') : h('p', { class: 'muted small' }, 'Nadie más votó su investidura: gobernará en solitario.'),
+      section(dr ? 'Reparto provisional' : 'Reparto', draftList(dr ? dr.map : null, pres), h('p', { class: 'muted small' }, dr ? 'Se actualiza según lo va decidiendo. Aún puede cambiarlo.' : 'Todavía no ha movido ninguna cartera.'))) };
   }
   const eligible = [V.me].concat(V.gov.supporters || []);
-  if (!UI.minDraft) { UI.minDraft = {}; MINISTRIES.forEach(m => UI.minDraft[m.id] = V.me); }
+  if (!UI.minDraft) { UI.minDraft = {}; MINISTRIES.forEach(m => UI.minDraft[m.id] = V.me); act({ type: 'govDraft', map: UI.minDraft }, { toast: false }); }
   return {
     side: h('div', { class: 'dock right wide glass', 'data-sk': 'mins' }, h('h2', null, 'Tu Consejo de Ministros'),
-      h('p', { class: 'muted small' }, 'Reparte las carteras entre tu partido y quienes votaron tu investidura. Cada ministerio da 1 PC por trimestre y una acción especial a quien lo ocupe.'),
+      h('p', { class: 'muted small' }, 'Reparte las carteras entre tu partido y quienes votaron tu investidura. Cada ministerio da 1 PC por trimestre y una acción especial a quien lo ocupe. Los demás jugadores ven cómo vas repartiéndolas.'),
       h('div', { class: 'stack' }, MINISTRIES.map(m => h('div', { class: 'min-row' }, icon(m.icon, { size: 22, cls: 'min-ico' }), h('div', { class: 'grow' }, h('b', null, m.name), h('div', { class: 'muted small' }, m.power)),
-        h('select', { onchange: e => UI.minDraft[m.id] = e.target.value }, eligible.map(id => h('option', { value: id, selected: UI.minDraft[m.id] === id }, P(id).short)))))),
+        h('select', { onchange: e => { UI.minDraft[m.id] = e.target.value; act({ type: 'govDraft', map: UI.minDraft }, { toast: false }); } }, eligible.map(id => h('option', { value: id, selected: UI.minDraft[m.id] === id }, P(id).short)))))),
       h('div', { class: 'btn-row' }, btn('Nombrar al Gobierno', () => { act({ type: 'ministries', map: UI.minDraft }); UI.minDraft = null; }, { kind: 'primary', icon: 'check' }))),
   };
+}
+// Aviso para el resto de jugadores mientras el presidente remodela el Gobierno
+function renderGovDraft() {
+  let el = document.getElementById('gov-draft');
+  const d = V && V.gov && V.gov.draft;
+  if (!(d && d.kind === 'reshuffle' && d.by !== V.me && V.phase === 'actions' && P(d.by))) { if (el) el.remove(); return; }
+  if (!el) { el = h('div', { id: 'gov-draft', class: 'gov-draft glass' }); document.body.appendChild(el); }
+  el.innerHTML = '';
+  el.appendChild(h('div', null, h('b', null, `${P(d.by).candidate.name} está remodelando el Gobierno`), h('div', { class: 'muted small' }, 'Reparto provisional:')));
+  el.appendChild(draftList(d.map, P(d.by)));
 }
 function governmentCard() {
   const pres = P(V.gov.president);
@@ -945,9 +972,13 @@ function ministryLine(p, mid) {
 function openReshuffle() {
   const eligible = [V.me].concat(V.gov.supporters || []);
   const draft = Object.assign({}, V.gov.ministers);
-  modal('Remodelar el Gobierno', h('div', { class: 'stack' }, MINISTRIES.map(m => h('div', { class: 'min-row' }, icon(m.icon, { size: 20 }), h('b', { class: 'grow' }, m.name),
-    h('select', { onchange: e => draft[m.id] = e.target.value }, eligible.map(id => h('option', { value: id, selected: draft[m.id] === id }, P(id).short)))))),
-  close => [btn('Nombrar (1 PC)', () => { close(); act({ type: 'reshuffle', map: draft }); }, { kind: 'primary' })]);
+  const share = () => act({ type: 'govDraft', map: draft }, { toast: false });
+  let done = false;
+  share();
+  modal('Remodelar el Gobierno', h('div', { class: 'stack' }, h('p', { class: 'muted small' }, 'Los demás jugadores ven lo que vas eligiendo.'), MINISTRIES.map(m => h('div', { class: 'min-row' }, icon(m.icon, { size: 20 }), h('b', { class: 'grow' }, m.name),
+    h('select', { onchange: e => { draft[m.id] = e.target.value; share(); } }, eligible.map(id => h('option', { value: id, selected: draft[m.id] === id }, P(id).short)))))),
+  close => [btn('Nombrar (1 PC)', () => { done = true; close(); act({ type: 'reshuffle', map: draft }); }, { kind: 'primary' })],
+  { onClose: () => { if (!done) act({ type: 'govDraft', map: null }, { toast: false }); } });
 }
 
 // ---------- Redactor de leyes ----------

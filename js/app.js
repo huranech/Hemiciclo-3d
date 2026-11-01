@@ -45,6 +45,7 @@ function render() {
   setRegion('side', c.side || null);
   setRegion('bottom', bottomBar());
   renderChat();
+  renderGovDraft();
   syncScene();
 }
 function renderRegion(which) {

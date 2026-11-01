@@ -141,7 +141,7 @@ function allReady() {
   const active = G.players.filter(p => p.online);
   return active.length > 0 && active.every(p => G.ready[p.id]);
 }
-function setPhase(ph) { G.phase = ph; resetReady(); save(); }
+function setPhase(ph) { G.phase = ph; if (G.gov) delete G.gov.draft; resetReady(); save(); }
 
 // Se llama tras cada acción: si todos están listos, avanza
 function checkAdvance() {
@@ -912,12 +912,23 @@ function hostHandleAction(pid, a) {
       if (!G.inv.candidates.includes(a.cand)) return fail('Candidato desconocido.');
       if (!['si', 'no', 'abs'].includes(a.value)) return fail('Voto no válido.');
       G.inv.votes[pid][a.cand] = a.value; return ok();
+    case 'govDraft': {
+      // el presidente enseña a los demás el reparto de carteras mientras lo prepara (formación de gobierno o remodelación)
+      const resh = G.phase === 'actions';
+      if (!(G.phase === 'ministries' || resh) || G.gov.president !== pid) return fail('Ahora no.');
+      if (!a.map) { delete G.gov.draft; return ok(); }
+      const elig = [pid].concat(G.gov.supporters || []);
+      const dm = {};
+      for (const mi of MINISTRIES) dm[mi.id] = elig.includes(a.map[mi.id]) ? a.map[mi.id] : pid;
+      G.gov.draft = { by: pid, kind: resh ? 'reshuffle' : 'ministries', map: dm };
+      return ok();
+    }
     case 'ministries': {
       if (G.phase !== 'ministries' || G.gov.president !== pid) return fail('Solo el presidente forma gobierno.');
       const eligible = [pid].concat(G.gov.supporters || []);
       const m = {};
       for (const mi of MINISTRIES) m[mi.id] = eligible.includes(a.map && a.map[mi.id]) ? a.map[mi.id] : pid;
-      G.gov.ministers = m;
+      G.gov.ministers = m; delete G.gov.draft;
       logEvent(G, { kind: 'gobierno', importance: 6, ministers: m, party: pid });
       afterGovernmentFormation(); return ok('Gobierno nombrado.');
     }
@@ -1198,7 +1209,7 @@ function actor(party) {
       const m = {};
       for (const mi of MINISTRIES) m[mi.id] = eligible.includes(a.map && a.map[mi.id]) ? a.map[mi.id] : party.id;
       spend(1, 0); ta.reshuffle = 1;
-      G.gov.ministers = m;
+      G.gov.ministers = m; delete G.gov.draft;
       logEvent(G, { kind: 'remodelacion', importance: 5, party: party.id, ministers: m });
       log('Remodela el Gobierno');
       return ok('Nuevo Gobierno.');
