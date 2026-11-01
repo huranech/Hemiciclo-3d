@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Hemiciclo</title>
+  <meta name="description" content="Juego de estrategia parlamentaria en 3D para 3 a 7 jugadores en línea.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Condensed:wght@500;600;700&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="scene"></canvas>
+  <div id="labels"></div>
+  <div id="hud">
+    <div id="hud-top"></div>
+    <div id="map-modes" class="glass" style="display:none"></div>
+    <div id="map-lod" class="glass" style="display:none"></div>
+    <div id="hud-main"></div>
+    <div id="hud-side"></div>
+    <div id="hud-bottom"></div>
+    <div id="chat" class="glass" style="display:none"></div>
+  </div>
+  <div id="pre"></div>
+  <div id="tooltip" class="glass" style="display:none"></div>
+  <noscript>Hemiciclo necesita JavaScript.</noscript>
+
+  <script src="lib/three.bundle.js"></script>
+  <script src="lib/peerjs.min.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/icons-data.js"></script>
+  <script src="js/icons.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/faces.js"></script>
+  <script src="js/world.js"></script>
+  <script src="js/economy.js"></script>
+  <script src="js/firms.js"></script>
+  <script src="js/labor.js"></script>
+  <script src="js/finance.js"></script>
+  <script src="js/markets.js"></script>
+  <script src="js/needs.js"></script>
+  <script src="js/politics.js"></script>
+  <script src="js/regions.js"></script>
+  <script src="js/foreign.js"></script>
+  <script src="js/news.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/net.js"></script>
+  <script src="js/scene3d.js"></script>
+  <script src="js/scene-map.js"></script>
+  <script src="js/scene-chamber.js"></script>
+  <script src="js/scene-studio.js"></script>
+  <script src="js/ui-core.js"></script>
+  <script src="js/ui-screens.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
