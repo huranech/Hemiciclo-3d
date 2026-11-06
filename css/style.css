@@ -694,3 +694,22 @@ body:not([data-scene=map]) #map-lod { display: none !important; }
 .missions-peek .mission{min-height:0;height:auto;aspect-ratio:auto}
 .missions-peek .row h3{display:flex;align-items:center;gap:6px;margin:0;white-space:nowrap}
 .missions-peek .stack{gap:8px}
+
+.phase-timer{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.08);font-variant-numeric:tabular-nums}
+.phase-timer.urgent{background:rgba(214,40,57,.35);color:#ffd9dd;animation:ptpulse 1s infinite}
+@keyframes ptpulse{50%{opacity:.6}}
+
+/* aviso de mensajes del chat */
+.btn.badge{color:#fff;background:var(--brass);animation:chatpulse 1.2s ease-in-out infinite}
+.btn.badge .ico,.btn.badge svg{color:#fff}
+@keyframes chatpulse{0%,100%{box-shadow:0 0 0 0 rgba(214,170,60,.7)}50%{box-shadow:0 0 0 8px rgba(214,170,60,0)}}
+.chat-toast{display:flex;gap:10px;align-items:flex-start;cursor:pointer;border-left-color:var(--brass);max-width:min(420px,90vw)}
+/* noche electoral */
+.night-prog { margin: 6px 0 10px; }
+.night-prog .bar { height: 8px; border-radius: 6px; background: rgba(255,255,255,.08); overflow: hidden; margin-top: 4px; }
+.night-prog .bar i { display: block; height: 100%; background: var(--brass); transition: width .3s; }
+.night-bar { display: inline-flex; align-items: center; gap: 6px; justify-content: flex-end; min-width: 110px; }
+.night-bar i { display: inline-block; height: 8px; border-radius: 4px; min-width: 2px; transition: width .3s; }
+.night-log li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+/* herramienta de carreteras */
+.road-tool { max-width: 380px; }

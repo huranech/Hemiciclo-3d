@@ -569,7 +569,9 @@ function computeEconomy(G, initial) {
   // empresas públicas: lo que ganan entra en las cuentas; lo que pierden, sale; comprarlas, construirlas o ampliarlas
   if (e.peQ > 0) rev.empresasPublicas = e.peQ / QF; else if (e.peQ < 0) spend.perdidasEmpresas = -e.peQ / QF;
   if (e.peBuyQ) spend.inversionEmpresas = e.peBuyQ / QF;
-  if (!initial) { e.aidQ = 0; e.rescueQ = 0; e.investAidQ = 0; e.centersBuyQ = 0; e.centersOverQ = 0; e.centersSellQ = 0; e.peQ = 0; e.peBuyQ = 0; }
+  if (e.roadQ) spend.carreteras = e.roadQ / QF;
+  if (e.railQ) spend.ferrocarriles = e.railQ / QF;
+  if (!initial) { e.roadQ = 0; e.railQ = 0; e.aidQ = 0; e.rescueQ = 0; e.investAidQ = 0; e.centersBuyQ = 0; e.centersOverQ = 0; e.centersSellQ = 0; e.peQ = 0; e.peBuyQ = 0; }
   for (const k in spend) if (!spend[k]) delete spend[k];
 
   const conc = (p.concierto || []).filter(i => G.cantons[i] && !G.cantons[i].merged);
@@ -624,11 +626,13 @@ function computeEconomy(G, initial) {
     if (c.centersOverQ) sp.plantillaExtra = c.centersOverQ / QF;
     if (c.peQ < 0) sp.perdidasEmpresas = -c.peQ / QF;
     if (c.peBuyQ) sp.inversionEmpresas = c.peBuyQ / QF;
+    if (c.roadQ) sp.carreteras = c.roadQ / QF;
+    if (c.railQ) sp.ferrocarriles = c.railQ / QF;
     const revenue = sum(Object.values(r)), spending = sum(Object.values(sp));
     const debt = initial ? debt0 : Math.max(0, debt0 + (spending - revenue) * QF);
     c.budget = { revenue, spending, balance: revenue - spending, debt, debtRatio: debt / Math.max(0.01, gdpC), rev: r, spend: sp,
       taxRevenue: sum(Object.values(cRev[i])) };
-    if (!initial) { c.extraSpend = 0; c.centersBuyQ = 0; c.centersOverQ = 0; c.centersSellQ = 0; c.peQ = 0; c.peBuyQ = 0; }
+    if (!initial) { c.roadQ = 0; c.railQ = 0; c.extraSpend = 0; c.centersBuyQ = 0; c.centersOverQ = 0; c.centersSellQ = 0; c.peQ = 0; c.peBuyQ = 0; }
   });
   e.revenue = sum(Object.values(rev));
   e.spending = sum(Object.values(spend));
@@ -679,6 +683,8 @@ function computeEconomy(G, initial) {
   tensionC.forEach((v, i) => { tensionC[i] = v / Math.max(1, adultsC[i]); });
   // --- Servicios públicos por cantón ---
   if (!initial) e.infraQ = lerp(e.infraQ, 25 + avgAreaEff(G, 'transporte') * 13 + (e.plans.transporte ? 4 : 0), 0.05);
+  const roadConn = mainOf(G) === G ? roadConnectivity(G) : [];
+  const railQ = G.cantons.map((c, i) => (railFactorOf(G, i) - RAIL_F0) / (1 - RAIL_F0));
   G.cantons.forEach((c, i) => {
     const people = groups[i];
     const old = people.filter(cz => cz.age >= 65).length / Math.max(1, people.length);
@@ -692,7 +698,7 @@ function computeEconomy(G, initial) {
     c.stats.education = clamp(10 + teach * 7.5 + (e.plans.educacion ? 6 : 0) - waste * 0.5 + (cantApplies(p, 'educacion') && c.pol.lengua ? 1 : 0), 5, 98);
     c.stats.security = clamp(28 + cops * 11 - (c.stats.unemployment - 0.08) * 120 + (p.penal - 1) * 4 + (p.servicioMilitar ? 1 : 0) - (c.disaster ? 5 : 0) - [0, 1, 3][p.armasCiviles || 0], 5, 98);
     c.stats.social = clamp(20 + areaEff(G, c, 'social') * 22 - (c.stats.unemployment - 0.08) * 80 + (p.rentaBasica ? 10 : 0) + (e.plans.social ? 8 : 0) - waste * 0.5, 5, 98);
-    c.stats.transport = clamp(20 + areaEff(G, c, 'transporte') * 14 + (e.infraQ - 50) * 0.3, 5, 98);
+    c.stats.transport = clamp(20 + areaEff(G, c, 'transporte') * 14 + (e.infraQ - 50) * 0.3 + (roadConn[i] || 0) * ROAD_TRANSPORT_BONUS + (railQ[i] || 0) * RAIL_TRANSPORT_BONUS, 5, 98);
     // convivencia: muchos inmigrantes recién llegados de culturas muy distintas, y poco integrados, traen más delincuencia
     const tension = tensionC[i] * clamp(1 - (c.stats.social - 55) / 200, 0.6, 1.3);
     c.stats.tension = tension;

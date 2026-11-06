@@ -27,7 +27,7 @@ function hostNewGame(cfg, lobbyPlayers) {
     proposals: [], ready: {}, chat: [], qEvents: [], announcements: [], lawLog: [], barometers: [], papers: [],
     gov: { president: null, ministers: {}, interim: false, investedTurn: null, supporters: [] },
     elections: { lastNational: null, nextNational: 0, lastCantonal: null, nextCantonal: 0 },
-    history: { elections: [], cantonal: [] },
+    history: { elections: [], cantonal: [] }, staggerCantonal: cfg.stagger !== false, chaos: clamp(+cfg.chaos || 0, 0, CHAOS_LEVELS.length - 1),
   };
   generateWorld(G, { nCantons: cfg.nCantons, nCountries: cfg.nCountries, agents: cfg.agents });
   initEconomyBase(G);
@@ -106,7 +106,23 @@ function deserializeGame(raw) {
     f.st.citizens = decodeCitizens(f.st, f.st.czPacked); delete f.st.czPacked;
   });
   linkStates(g);
+  migrateGoods(g);
+  migrateInfra(g);
   return g;
+}
+// Partidas guardadas antes de que existieran algunos productos (coches, viajes…): precios de partida
+function migrateGoods(g) {
+  if (g.world && g.world.prices) GOOD_IDS.forEach(k => { if (g.world.prices[k] == null) g.world.prices[k] = 1; });
+  worldStates(g).forEach(S => {
+    const e = S.eco; if (!e) return;
+    e.px = e.px || {};
+    GOOD_IDS.forEach(k => {
+      if (e.px[k] == null || !isFinite(e.px[k])) e.px[k] = worldPrice(S, k);
+      if (e.prices && e.prices[k] == null) e.prices[k] = e.px[k];
+      if (e.basket0 && e.basket0[k] == null) e.basket0[k] = 0;
+      (e.cprices || []).forEach(cp => { if (cp && cp[k] == null) cp[k] = e.px[k]; });
+    });
+  });
 }
 // (con muchos países la partida ocupa mucho: si se acerca al límite del navegador, se guarda comprimida)
 const SAVE_PACK_FROM = 3.2e6;
@@ -141,7 +157,13 @@ function allReady() {
   const active = G.players.filter(p => p.online);
   return active.length > 0 && active.every(p => G.ready[p.id]);
 }
-function setPhase(ph) { G.phase = ph; if (G.gov) delete G.gov.draft; resetReady(); save(); }
+const ACTION_SECONDS = 180;   // 3 min para actuar en el trimestre
+function setPhase(ph) { G.phase = ph; if (G.gov) delete G.gov.draft; G.timer = ph === 'actions' ? { end: Date.now() + ACTION_SECONDS * 1000 } : null; resetReady(); save(); }
+// El anfitrión llama cada segundo: si se acaba el tiempo de acciones, se pasa a la votación
+function timerTick() {
+  if (!G || G.phase !== 'actions' || !G.timer || Date.now() < G.timer.end) return false;
+  G.timer = null; forceAdvance(); return true;
+}
 
 // Se llama tras cada acción: si todos están listos, avanza
 function checkAdvance() {
@@ -594,6 +616,27 @@ function publicCenterAction(party, a) {
   save();
   return ok(a.op === 'open' ? `${f.name}: encargadas las obras (${fmt.bn(res.cost)}). Cuando la constructora termine el edificio, contratará personal según el presupuesto.` : `${f.name} cierra sus puertas.`);
 }
+// Carreteras: el Ministerio de Transporte (competencia nacional o compartida) o un gobierno cantonal (cantonal o
+// compartida, en su cantón). Cada obra cuesta 1 PC y lo que valgan sus casillas sale del presupuesto.
+function roadAction(party, a) {
+  const ok = (msg, data) => ({ ok: true, msg, data }), fail = msg => ({ ok: false, msg });
+  if (G.phase !== 'actions') return fail('Solo durante la fase de acciones.');
+  const owner = a.owner === 'estado' ? 'estado' : +a.owner;
+  if (!roadOwners(G, party).some(o => o.owner === owner)) return fail('No tienes la competencia de transporte de esa administración.');
+  if (party.pc < 1) return fail('Necesitas 1 PC.');
+  const hexes = (a.hexes || []).map(x => [+x[0], +x[1]]);
+  const rail = a.kind === 'rail';
+  const r = buildRoad(G, owner, hexes, { kind: rail ? 'rail' : 'road' });
+  if (!r.ok) return fail(r.msg);
+  party.pc -= 1;
+  const what = rail ? 'Vía de tren' : 'Carretera';
+  const placeName = ([q, r2]) => { const h = hexAtG(G, q, r2); return h && h.cn ? h.cn : h && h.c === (G.ci || 0) && G.cantons[h.k] ? 'el campo de ' + G.cantons[h.k].name : 'la frontera'; };
+  const from = placeName(hexes[0]), to = placeName(hexes[hexes.length - 1]);
+  party.log.unshift({ turn: G.turn, text: `${what} de ${from} a ${to} (${r.n} casillas)` });
+  logEvent(G, { kind: 'carretera', rail, importance: 4, party: party.id, owner, canton: owner === 'estado' ? null : owner, n: r.n, cost: r.cost, from, to });
+  save();
+  return ok(`${what} de ${from} a ${to}: ${r.n} casillas nuevas por ${fmt.bn(r.cost)}.`);
+}
 // Empresas públicas: las del Estado las lleva el Ministerio de Economía; las de cada cantón, su presidente.
 // Crear, nacionalizar, privatizar, ampliar o cerrar cuesta 1 PC; plantilla, sueldo y precios, nada.
 function publicFirmAction(party, a) {
@@ -827,6 +870,7 @@ function hostHandleAction(pid, a) {
     case 'popStats': return ok(undefined, popStats(a.scope, a.idx));
     case 'publicCenter': return publicCenterAction(p, a);
     case 'publicFirm': return publicFirmAction(p, a);
+    case 'road': return roadAction(p, a);
     case 'ready':
       if (G.phase === 'parties' && a.value && !p.configured) return fail('Primero funda tu partido.');
       if (G.phase === 'ministries' || G.phase === 'debate' || G.phase === 'gameover') return fail('En esta fase no hace falta.');
@@ -852,7 +896,7 @@ function hostHandleAction(pid, a) {
       if (colorTaken(d.color, pid)) return fail('Ese color (o uno casi igual) ya lo usa otro partido.');
       p.name = name; p.short = String(d.short || '').toUpperCase().slice(0, 6) || name.slice(0, 3).toUpperCase();
       p.color = d.color.toLowerCase(); p.color2 = /^#[0-9a-f]{6}$/i.test(d.color2 || '') ? d.color2 : '#ffffff';
-      p.logo = { shape: LOGO_SHAPES.some(s => s.id === (d.logo && d.logo.shape)) ? d.logo.shape : 'circle', icon: PARTY_ICONS_ALL.includes(d.logo && d.logo.icon) ? d.logo.icon : PARTY_ICONS_ALL[0],
+      p.logo = { shape: LOGO_SHAPES.some(s => s.id === (d.logo && d.logo.shape)) ? d.logo.shape : 'circle', icon: isPartyIcon(d.logo && d.logo.icon) ? d.logo.icon : PARTY_ICONS_ALL[0],
         style: LOGO_STYLES.some(s => s.id === (d.logo && d.logo.style)) ? d.logo.style : 'lleno', text: p.short };
       p.candidate = { name: String((d.candidate && d.candidate.name) || p.player).trim().slice(0, 30) || p.player, face: sanitizeFace(d.candidate && d.candidate.face) };
       p.configured = true;
@@ -1151,11 +1195,13 @@ function actor(party) {
           logEvent(G, { kind: 'plan', importance: 3, party: party.id, area: 'inversion' });
           msg = 'Plan de atracción de inversiones en marcha.';
         } else {
-          const opts = FIELDS.salarioMin.options;
-          let i = opts.indexOf(G.pol.salarioMin); if (i < 0) i = 2;
-          const j = clamp(i + (a.dir === 'up' ? 1 : -1), 0, opts.length - 1);
-          if (i === j) return fail('No se puede mover más.');
-          G.pol.salarioMin = opts[j];
+          const cur = G.pol.salarioMin || 0, up = a.dir === 'up', MAXW = FIELDS.salarioMin.range[1];
+          // de cinco en cinco puntos (y desde «sin salario mínimo», al 35 %; por debajo del 20 % se suprime)
+          let nv = up ? (cur <= 0 ? 0.35 : cur + 0.05) : (cur - 0.05 < 0.2 ? 0 : cur - 0.05);
+          nv = clamp(Math.round(nv * 100) / 100, 0, MAXW);
+          if (Math.abs(nv - cur) < 1e-9) return fail('No se puede mover más.');
+          const opts = [cur, nv], j = 1;
+          G.pol.salarioMin = nv;
           groupEffect(G, cz => ['operario', 'agricultor', 'pescador', 'parado'].includes(citizenStatus(cz)), party.id, a.dir === 'up' ? 0.15 : -0.15);
           groupEffect(G, cz => citizenStatus(cz) === 'empresario', party.id, a.dir === 'up' ? -0.15 : 0.15);
           logEvent(G, { kind: 'smi', importance: 5, party: party.id, dir: a.dir, value: opts[j] });
@@ -1268,6 +1314,10 @@ function viewFor(pid) {
   void worksById; void pct;
   // los otros países: su economía, sus partidos, su Parlamento, sus leyes y su gente
   out.peLaw = peShare(G);
+  out.roads = (G.roads || []).slice(); out.roadUnit = ROAD_COST * wageFactor(G); out.roadOwners = roadOwners(G, partyById(G, pid) || {});
+  out.roadConn = roadConnectivity(G);
+  out.rails = (G.rails || []).slice(); out.railUnit = RAIL_COST * wageFactor(G); out.railInfo = railCantonInfo(G);
+  out.timerLeft = G.timer ? Math.max(0, G.timer.end - Date.now()) : null; delete out.timer;
   out.foreign = G.foreign.map(f => foreignView(G, f));
   out.cultures2 = Object.fromEntries(Object.entries(NATION_CULTURES).map(([k, c]) => [k, c.name]));
   delete out.eco.basket0;

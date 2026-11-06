@@ -147,7 +147,11 @@ const ICON_PATHS = {"dumbbell":"<path d=\"M14.4 14.4 9.6 9.6\" /><path d=\"M18.6
 "arrow-up-right":"<path d=\"M7 7h10v10\" /> <path d=\"M7 17 17 7\" />",
 "arrow-down-right":"<path d=\"m7 7 10 10\" /> <path d=\"M17 7v10H7\" />",
 "activity":"<path d=\"M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2\" />",
-"thermometer":"<path d=\"M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z\" />"};
+"thermometer":"<path d=\"M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z\" />",
+"route":"<circle cx=\"6\" cy=\"19\" r=\"3\" /><path d=\"M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15\" /><circle cx=\"18\" cy=\"5\" r=\"3\" />",
+"undo-2":"<path d=\"M9 14 4 9l5-5\" /><path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\" />",
+"car":"<path d=\"M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2\" /><circle cx=\"7\" cy=\"17\" r=\"2\" /><path d=\"M9 17h6\" /><circle cx=\"17\" cy=\"17\" r=\"2\" />",
+"ticket":"<path d=\"M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z\" /><path d=\"M13 5v2\" /><path d=\"M13 17v2\" /><path d=\"M13 11v2\" />"};
 const PARTY_ICONS = ["star","heart","flower-2","flower","leaf","sprout","trees","tree-pine","tree-deciduous","wheat","sun","sunrise","moon","mountain","mountain-snow","waves","droplet","wind","zap","flame","lightbulb","atom","orbit","globe","earth","compass","anchor","sailboat","fish","bird","feather","paw-print","shell","clover","gem","crown","key","scale","shield","flag","landmark","castle","church","book-open","hammer","factory","tractor","pickaxe","cog","rocket","hand-heart","handshake","heart-handshake","users","baby","bike","umbrella","hourglass","infinity","rainbow","snowflake","sparkles","medal","swords","brain","bell","circle-dot","tent-tree"];
 
 ICON_PATHS['link'] = "<path d=\"M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71\" /><path d=\"M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71\" />";

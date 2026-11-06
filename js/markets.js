@@ -25,7 +25,7 @@ const STEP_COST = { land: 1, sea: 1.5 };    // pasos que cuesta cruzar a un cant
 // Nodos: los cantones de todos los países. Se construye siempre desde el estado de nuestro país (G.main).
 function marketTopo(G0) {
   const G = G0.main || G0;
-  if (G._mk) return G._mk;
+  if (G._mk && G._mk.rv === infraVer(G)) return G._mk;
   const nodes = [];
   G.cantons.forEach((c, i) => nodes.push({ key: 'c' + i, country: 0, nid: G.nid || 'f0', canton: i, name: c.name }));
   G.foreign.forEach(f => f.cantons.forEach(fc => nodes.push({ key: f.id + ':' + fc.idx, country: f.mapIndex, nid: f.id, fid: f.id, canton: fc.idx, name: fc.nominal ? f.name : fc.name + ' (' + f.name + ')' })));
@@ -67,6 +67,9 @@ function marketTopo(G0) {
     addE(best.a, best.b, 'sea', STEP_COST.sea + Math.max(0, best.d - 4) * 0.35);
     comp[find(best.a)] = find(best.b);
   }
+  // carreteras y vías de tren: si unen las capitales de dos cantones (o países), el transporte entre ellos sale
+  // más barato (por tren, mucho más)
+  for (const re of roadMarketEdges(G, nodes)) addE(re.a, re.b, re.kind, re.steps);
   const E = Array.from(edges.values());
   // distancias (en pasos) entre todos los nodos: por cualquier ruta y solo por tierra
   const dijkstra = landOnly => nodes.map((_, s) => {
@@ -77,14 +80,14 @@ function marketTopo(G0) {
       if (u < 0 || d[u] === Infinity) break;
       done[u] = true;
       for (const e of E) {
-        if (landOnly && e.kind !== 'land') continue;
+        if (landOnly && e.kind === 'sea') continue;
         const v = e.a === u ? e.b : e.b === u ? e.a : -1; if (v < 0) continue;
         if (d[u] + e.steps < d[v]) d[v] = d[u] + e.steps;
       }
     }
     return d;
   });
-  G._mk = { nodes, edges: E, idx, nodeOf, dist: dijkstra(false), distLand: dijkstra(true) };
+  G._mk = { nodes, edges: E, idx, nodeOf, dist: dijkstra(false), distLand: dijkstra(true), rv: infraVer(G) };
   return G._mk;
 }
 // Nodo de mercado de un cantón de un país
@@ -104,11 +107,12 @@ const worldPrice = (G, g) => GOODS[g].price * ((G.world && G.world.prices && G.w
 // Reparto de una necesidad entre los bienes que la cubren: cada hogar mira lo que le cuesta cada bien por
 // unidad cubierta (precio con IVA entre lo que cubre) y compra sobre todo el más barato, con algo de variedad.
 // priceOf(g): precio del bien; devuelve { bien: parte de la necesidad que cubre }.
-function needShares(n, priceOf, armasLaw) {
+// caps: topes distintos de los normales para algún bien (como los viajes en tren donde no hay tren)
+function needShares(n, priceOf, armasLaw, caps) {
   const opts = [];
   if (!Object.keys(n.goods).length) return {};
   for (const g in n.goods) {
-    let max = (n.max && n.max[g]) ?? 1;
+    let max = (caps && caps[g] != null) ? caps[g] : (n.max && n.max[g]) ?? 1;
     if (g === 'armas') { max = [0, 0.08, 0.25][armasLaw ?? 0]; if (max <= 0) continue; }
     opts.push({ g, c: Math.max(1e-9, priceOf(g)) / n.goods[g], max, min: (n.min && n.min[g]) || 0 });
   }

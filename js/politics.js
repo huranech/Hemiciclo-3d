@@ -135,6 +135,19 @@ function nationalSeats(G, res, rules) {
 function simulateVote(G, level, noiseScale = 0.45) {
   const res = { votes: {}, byCanton: G.cantons.map(c => ({ votes: {}, districts: range(c.nationalSeats).map(() => ({})), electorate: 0, voters: 0 })), electorate: 0, voters: 0, choices: new Map() };
   G.players.forEach(p => { res.votes[p.id] = 0; res.byCanton.forEach(bc => bc.votes[p.id] = 0); });
+  // resultados por localidad (la casilla donde vive cada votante): para la noche electoral
+  const homeHex = new Map((G.homes || []).map(hm => [hm.id, hm.q + ',' + hm.r]));
+  const places = new Map();
+  // (una ciudad de varias casillas cuenta como una sola localidad)
+  const placeOf = (cz, i) => {
+    const hk = homeHex.get(cz.hh) || (G.cantons[i].cityHex || []).join(',');
+    const hx = hexAtG(G, ...hk.split(',').map(Number));
+    const k = hx && hx.cn && isSettlement(hx) ? 'n' + i + ':' + hx.cn : hk;
+    let pl = places.get(k);
+    if (!pl) { pl = { k: hk, ks: [hk], nm: hx && hx.cn && isSettlement(hx) ? hx.cn : null, c: i, e: 0, n: 0, v: {} }; places.set(k, pl); }
+    else if (!pl.ks.includes(hk)) pl.ks.push(hk);
+    return pl;
+  };
   // distritos: ordenamos a los ciudadanos de cada cantón por una "geografía" estable
   const groups = byCanton(G);
   groups.forEach((list, i) => {
@@ -146,7 +159,9 @@ function simulateVote(G, level, noiseScale = 0.45) {
       res.byCanton[i].electorate += c.w; res.electorate += c.w;
       const v = citizenChoice(G, cz, level, c, noiseScale);
       res.choices.set(cz.id, v);
+      const pl = placeOf(cz, i); pl.e += c.w;
       if (!v) return;
+      pl.n += c.w; pl.v[v] = (pl.v[v] || 0) + c.w;
       res.byCanton[i].voters += c.w; res.voters += c.w;
       res.byCanton[i].votes[v] += c.w; res.votes[v] += c.w;
       const d = Math.min(nd - 1, Math.floor(k / sorted.length * nd));
@@ -154,6 +169,7 @@ function simulateVote(G, level, noiseScale = 0.45) {
     });
   });
   res.turnout = res.voters / Math.max(1, res.electorate);
+  res.places = [...places.values()].filter(pl => pl.e > 0);
   return res;
 }
 
@@ -172,7 +188,7 @@ function runNationalElection(G) {
   const result = {
     level: 'nacional', turn: G.turn, votes: res.votes, shares, seats, prevSeats, turnout: res.turnout,
     byCanton: res.byCanton.map((bc, i) => ({ votes: bc.votes, seats: byCantonSeats[i], turnout: bc.voters / Math.max(1, bc.electorate), districts: bc.districts })),
-    system: G.pol.sistemaElectoral, threshold: G.pol.umbral,
+    system: G.pol.sistemaElectoral, threshold: G.pol.umbral, places: res.places,
   };
   G.parliament.lastElection = result;
   G.elections.lastNational = G.turn;
@@ -192,8 +208,11 @@ function runCantonalElections(G) {
     c.parliament.lastElection = { turn: G.turn, votes: bc.votes, shares, seats, turnout: bc.voters / Math.max(1, bc.electorate) };
     return { canton: c.idx, seats, shares, turnout: bc.voters / Math.max(1, bc.electorate) };
   });
+  G.cantonalNight = { turn: G.turn, places: res.places, threshold: Math.max(0.03, G.pol.umbral) };
+  // la primera vez, si las cantonales van desfasadas, la siguiente cae a mitad de legislatura (y luego cada legislatura)
+  const first = G.elections.lastCantonal == null;
   G.elections.lastCantonal = G.turn;
-  G.elections.nextCantonal = G.turn + G.pol.legislatura * 4;
+  G.elections.nextCantonal = G.turn + (first && G.staggerCantonal ? Math.round(G.pol.legislatura * 2) : G.pol.legislatura * 4);
   return results;
 }
 

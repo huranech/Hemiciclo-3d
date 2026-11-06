@@ -34,6 +34,7 @@ const STAFF = {
   electrica: { base: 'operario', q: 'ingeniero', min: 0.2, max: 0.5 }, constructora: { base: 'operario', q: 'ingeniero', min: 0.2, max: 0.5 },
   telecom: { base: 'operario', q: 'ingeniero', min: 0.6, max: 1 }, medios: { base: 'operario', q: 'periodista', min: 0.6, max: 1 },
   gimnasio: { base: 'comerciante', q: 'oficinista', min: 0.2, max: 0.6 }, comercio: { base: 'comerciante', q: 'oficinista', min: 0, max: 0.3 },
+  automovilistica: { base: 'operario', q: 'ingeniero', min: 0.2, max: 0.4 }, ferroviaria: { base: 'operario', q: 'ingeniero', min: 0.2, max: 0.4 },
   banco: { base: 'oficinista', q: 'oficinista', min: 1, max: 1 },
   sanidad: { base: 'operario', q: 'sanitario', min: 0.7, max: 1 }, educacion: { base: 'operario', q: 'academico', min: 0.8, max: 1 },
   seguridad: { base: 'policia' }, policia: { base: 'policia' },
@@ -320,6 +321,7 @@ function cantonNeighbors(G) {
   G._cadj = { ver, adj: near };
   return near;
 }
+const JOB_SEARCH_MISS = 0.45;   // parte de los parados que cada trimestre no encuentra ninguna oferta que mirar
 function matchJobs(G, x) {
   const e = G.eco;
   const vacs = [];
@@ -335,6 +337,8 @@ function matchJobs(G, x) {
   for (const cz of G.citizens) {
     if (!inLaborForce(cz) || owners.has(cz.id)) continue;
     if (cz.emp && !RNG.chance(0.2)) continue;
+    // fricción: encontrar trabajo lleva tiempo (no se ve toda la oferta, se hacen entrevistas, no se cuadra el momento)
+    if (!cz.emp && RNG.chance(JOB_SEARCH_MISS)) continue;
     seekers.push(cz);
   }
   const adj = cantonNeighbors(G);

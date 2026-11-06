@@ -61,7 +61,7 @@ const NEWS_NOUN = {
   judicial: 'la independencia judicial', energia: 'el modelo energético', sistemaElectoral: 'el sistema electoral', tvPublica: 'la televisión pública',
   financiacion: 'la financiación de los partidos', ct_irpf: 'el tramo cantonal del IRPF', ct_turismo: 'la promoción turística', ct_infra: 'la obra pública',
   ct_campo: 'las ayudas al campo', ct_sanidad: 'el gasto sanitario', ct_educacion: 'el gasto educativo', ct_seguridad: 'la policía cantonal',
-  cupo: 'el cupo del concierto', ayudaInversion: 'las ayudas a la inversión empresarial', curriculo: 'el currículo escolar', simbolos: 'la ley de símbolos', derechoDecidir: 'la ley de consultas',
+  cupo: 'el cupo del concierto', ayudaInversion: 'las ayudas a la inversión empresarial', viasPrivadas: 'las vías de tren privadas', curriculo: 'el currículo escolar', simbolos: 'la ley de símbolos', derechoDecidir: 'la ley de consultas',
   ct_rotulacion: 'el uso de la lengua propia en la Administración', ct_fiestas: 'la promoción de la cultura propia',
 };
 const BOOL_SAY = {
@@ -74,6 +74,7 @@ const BOOL_SAY = {
   ct_lengua: ['Fin de la inmersión lingüística', 'Inmersión lingüística en las escuelas'],
   selecciones: ['Solo la selección nacional podrá competir', 'Los cantones tendrán sus propias selecciones'], ct_tv: ['Cierra la televisión pública cantonal', 'Nace una televisión pública cantonal'],
   ct_exterior: ['Cierran las delegaciones del cantón en el exterior', 'El cantón abre delegaciones en el exterior'],
+  viasPrivadas: ['Solo las Administraciones podrán construir vías de tren', 'Las compañías ferroviarias podrán tender sus propias vías'],
 };
 const AREA_NAMES = { sanidad: 'la sanidad', educacion: 'la educación', seguridad: 'la seguridad ciudadana', transporte: 'el transporte', social: 'los asuntos sociales' };
 // Frase (oración corta) que describe el cambio de un campo
@@ -141,6 +142,11 @@ function writeStory(G, o, ev) {
         body: `${pres.name} encabezará el Gobierno${sup ? ' con el apoyo de ' + sup : ''}.`, parties: [pres.id], portrait: pres.id };
     }
     case 'investiduraFallida': return { headline: 'Bloqueo: nadie logra la investidura', body: 'Ningún candidato reunió los apoyos necesarios. Habrá repetición electoral.' };
+    case 'carretera': {
+      const p = P(ev.party), who = ev.owner === 'estado' ? 'El Ministerio de Transporte' : 'El gobierno de ' + G.cantons[ev.canton].name;
+      if (ev.rail) return { headline: `${who} tiende una vía de tren de ${ev.from} a ${ev.to}`, body: `La obra suma ${ev.n} casillas de vía y cuesta ${fmt.bn(ev.cost)}. ${p.short} promete trenes entre las dos ciudades y un transporte de mercancías mucho más barato.`, parties: [p.id] };
+      return { headline: `${who} construye una carretera de ${ev.from} a ${ev.to}`, body: `La obra suma ${ev.n} casillas de carretera y cuesta ${fmt.bn(ev.cost)}. ${p.short} promete que abaratará el transporte de mercancías.`, parties: [p.id] };
+    }
     case 'gobierno': case 'remodelacion': {
       const pres = P(ev.party);
       const by = {}; Object.entries(ev.ministers).forEach(([m, pid]) => (by[pid] = by[pid] || []).push(MINISTRIES.find(x => x.id === m).name));

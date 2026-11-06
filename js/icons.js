@@ -119,7 +119,9 @@ const LOGO_ICON_GROUPS = [
   { name: 'Iconos', ids: LUCIDE_LOGO },
 ];
 const PARTY_ICONS_ALL = LOGO_ICON_GROUPS.flatMap(g => g.ids);
-const logoIconName = id => (LOGO_SYMBOLS[id] && LOGO_SYMBOLS[id].name) || LOGO_ICON_NAMES[id] || id;
+const logoIconName = id => (LOGO_SYMBOLS[id] && LOGO_SYMBOLS[id].name) || LOGO_ICON_NAMES[id] || String(id).replace(/-/g, ' ');
+// Válido como símbolo de partido: los curados de arriba o cualquier icono del catálogo completo de Lucide
+const isPartyIcon = id => typeof id === 'string' && (LUCIDE_ALL_SET.has(id) || PARTY_ICONS_ALL.includes(id));
 
 const LOGO_PATHS = {
   circle: '<circle cx="50" cy="50" r="46"/>',

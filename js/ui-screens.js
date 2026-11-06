@@ -3,13 +3,42 @@
 // ============================================================
 'use strict';
 
-const SPEND_ICONS = Object.assign({ administracion: 'building-2', pensiones: 'users', desempleo: 'briefcase', rentaBasica: 'hand-coins', intereses: 'percent', corrupcion: 'triangle-alert', planes: 'sparkles', compraCentros: 'hand-coins', plantillaExtra: 'users', perdidasEmpresas: 'factory', inversionEmpresas: 'factory', vivienda: 'house', rescates: 'landmark', ayudasInversion: 'factory', cupo: 'handshake', identidad: 'flag' },
+const SPEND_ICONS = Object.assign({ administracion: 'building-2', pensiones: 'users', desempleo: 'briefcase', rentaBasica: 'hand-coins', intereses: 'percent', corrupcion: 'triangle-alert', planes: 'sparkles', compraCentros: 'hand-coins', plantillaExtra: 'users', perdidasEmpresas: 'factory', inversionEmpresas: 'factory', carreteras: 'route', ferrocarriles: 'train-front', vivienda: 'house', rescates: 'landmark', ayudasInversion: 'factory', cupo: 'handshake', identidad: 'flag' },
   ...NAT_SPEND.concat(CANT_SPEND, STANDALONE).map(x => ({ [x.id]: x.icon })));
 const SPEND_NAMES = Object.assign({ administracion: 'Administración', pensiones: 'Pensiones', desempleo: 'Prestaciones por desempleo', rentaBasica: 'Renta básica',
-  intereses: 'Intereses de la deuda', corrupcion: 'Sobrecostes', planes: 'Planes de choque', compraCentros: 'Compra de centros privados', perdidasEmpresas: 'Pérdidas de las empresas públicas', inversionEmpresas: 'Compra, obras y ampliación de empresas públicas', plantillaExtra: 'Plantillas de centros públicos por encima del presupuesto', vivienda: 'Cheque vivienda', rescates: 'Rescates bancarios', ayudasInversion: 'Ayudas a la inversión empresarial', cupo: 'Cupo al Estado (concierto)', identidad: 'Lengua, cultura y símbolos propios' }, ...NAT_SPEND.concat(CANT_SPEND, STANDALONE).map(x => ({ [x.id]: x.name })));
+  intereses: 'Intereses de la deuda', corrupcion: 'Sobrecostes', planes: 'Planes de choque', compraCentros: 'Compra de centros privados', perdidasEmpresas: 'Pérdidas de las empresas públicas', inversionEmpresas: 'Compra, obras y ampliación de empresas públicas', carreteras: 'Construcción de carreteras', ferrocarriles: 'Construcción de vías de tren', plantillaExtra: 'Plantillas de centros públicos por encima del presupuesto', vivienda: 'Cheque vivienda', rescates: 'Rescates bancarios', ayudasInversion: 'Ayudas a la inversión empresarial', cupo: 'Cupo al Estado (concierto)', identidad: 'Lengua, cultura y símbolos propios' }, ...NAT_SPEND.concat(CANT_SPEND, STANDALONE).map(x => ({ [x.id]: x.name })));
 const liveCantonsV = () => V.cantons.filter(c => !c.merged);
 const REV_ICONS = Object.assign({ carbono: 'leaf', aranceles: 'ship', otros: 'coins', empresasPublicas: 'factory', privatizaciones: 'hand-coins', transferencias: 'map', cupo: 'handshake', concierto: 'handshake' }, ...TAXES.map(t => ({ [t.id]: t.icon })));
 const REV_NAMES = Object.assign({ carbono: 'Impuesto al carbono', aranceles: 'Aranceles', otros: 'Otros ingresos (patrimonio)', empresasPublicas: 'Beneficios de las empresas públicas', transferencias: 'Transferencias del Estado', cupo: 'Cupo de los cantones con concierto', concierto: 'Tributos concertados (impuestos del Estado)', privatizaciones: 'Privatizaciones (venta de centros y empresas públicas)' }, ...TAXES.map(t => ({ [t.id]: t.name })));
+
+// ---------- Selector de símbolo: grupos curados + búsqueda en todo el catálogo Lucide ----------
+let iconQuery = '';
+let iconPool = null;
+const normIcon = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function iconButton(ic, D) {
+  const name = logoIconName(ic);
+  const b = h('button', { type: 'button', class: 'icon-btn logo-pick' + (D.logo.icon === ic ? ' on' : ''), title: name, 'aria-label': name, onclick: () => { D.logo.icon = ic; render(); } });
+  b.innerHTML = logoSVG(Object.assign({}, D.logo, { icon: ic, text: D.short || 'AB' }), D.color, D.color2, 34);
+  return b;
+}
+function fillIconHits(box, q, D) {
+  if (!iconPool) iconPool = [...new Set(PARTY_ICONS_ALL.concat(LUCIDE_ALL_IDS))];
+  const words = normIcon(q).split(/\s+/).filter(Boolean);
+  const hits = iconPool.filter(id => { const hay = normIcon(id + ' ' + logoIconName(id)); return words.every(w => hay.includes(w)); });
+  const MAX = 300;
+  box.replaceChildren(...hits.slice(0, MAX).map(ic => iconButton(ic, D)));
+  if (!hits.length) box.appendChild(h('div', { class: 'small muted', style: { gridColumn: '1 / -1' } }, 'Ningún símbolo coincide con «' + q.trim() + '».'));
+  else if (hits.length > MAX) box.appendChild(h('div', { class: 'small muted', style: { gridColumn: '1 / -1' } }, 'Mostrando ' + MAX + ' de ' + hits.length + '. Escribe más para acotar.'));
+}
+function symbolField(D) {
+  const hitsBox = h('div', { class: 'icon-grid icon-hits', style: { display: 'none', maxHeight: '240px', overflowY: 'auto' } });
+  const groups = h('div', { 'data-sk': 'icons', class: 'icon-groups' }, LOGO_ICON_GROUPS.map(g => h('div', null, h('div', { class: 'small muted icon-group-name' }, g.name),
+    h('div', { class: 'icon-grid' }, g.ids.map(ic => iconButton(ic, D))))));
+  const search = h('input', { type: 'search', class: 'icon-search', placeholder: 'Buscar en todo el catálogo: tren, mano, sol…', 'aria-label': 'Buscar símbolo', value: iconQuery,
+    oninput: e => { iconQuery = e.target.value; const on = !!iconQuery.trim(); groups.style.display = on ? 'none' : ''; hitsBox.style.display = on ? '' : 'none'; if (on) fillIconHits(hitsBox, iconQuery, D); } });
+  if (iconQuery.trim()) { groups.style.display = 'none'; hitsBox.style.display = ''; fillIconHits(hitsBox, iconQuery, D); }
+  return h('div', { class: 'field' }, h('label', null, 'Símbolo ', h('span', { class: 'small muted' }, '· ' + logoIconName(D.logo.icon))), search, groups, hitsBox);
+}
 
 // ---------- textos de fase ----------
 const PHASE_HELP = {
@@ -57,6 +86,17 @@ function topBar() {
     btn('', openMenu, { kind: 'ghost', icon: 'settings', title: 'Menú' })), V.turn >= 0 ? indicatorStrip() : null);
 }
 function quarterLabelV() { return V.turn <= 0 ? 'Fundación' : `${['1.er', '2.º', '3.er', '4.º'][(V.turn - 1) % 4]} trimestre de ${START_YEAR + Math.floor((V.turn - 1) / 4)} · ${V.turn}/${V.maxTurns}`; }
+function timerText() {
+  const ms = Math.max(0, (UI.timerEnd || 0) - Date.now()), s = Math.ceil(ms / 1000);
+  return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+}
+function tickPhaseTimer() {
+  const el = document.getElementById('phase-timer'); if (!el || !V || V.timerLeft == null) return;
+  const left = (UI.timerEnd || 0) - Date.now();
+  const b = el.querySelector('b'); if (b) b.textContent = timerText();
+  el.classList.toggle('urgent', left <= 20000);
+  if (left <= 20000 && left > 19000 && !UI.timerWarned) { UI.timerWarned = true; toast('Quedan 20 segundos para actuar.', 'bad'); }
+}
 function bottomBar() {
   const ready = !!V.ready[V.me];
   const online = V.players.filter(p => p.online);
@@ -68,6 +108,7 @@ function bottomBar() {
   return h('div', { class: 'bottombar glass' },
     h('div', { class: 'help' }, PHASE_HELP[V.phase] || ''),
     h('span', { class: 'spacer' }),
+    V.timerLeft != null && V.phase === 'actions' ? h('span', { class: 'phase-timer', id: 'phase-timer', title: 'Tiempo que queda para actuar este trimestre' }, icon('hourglass', { size: 15 }), h('b', null, timerText())) : null,
     needsReady ? h('span', { class: 'ready-count' }, `${nReady}/${online.length} listos`) : null,
     isHostP && (needsReady || V.phase === 'debate' || V.phase === 'ministries') && V.phase !== 'gameover' ? btn('Forzar', () => act({ type: 'advance' }), { kind: 'ghost', size: 'sm', icon: 'skip-forward', title: 'Avanzar sin esperar' }) : null,
     isHostP && V.phase === 'debate' ? btn('Saltar debate', () => askConfirm('¿Saltar el resto del debate? A cada partido se le asignará una respuesta al azar en los bloques que le falten, y su ideología saldrá de ahí.', 'Saltar debate', () => act({ type: 'skipDebate' })), { kind: 'ghost', size: 'sm', icon: 'fast-forward', title: 'Saltar todo el debate' }) : null,
@@ -186,9 +227,7 @@ function phaseParties() {
       h('div', { class: 'field' }, h('label', null, 'Color del símbolo'), swatches(D.color2, v => D.color2 = v, [{ hex: '#ffffff', name: 'Blanco' }, { hex: '#1a1a1a', name: 'Negro' }, { hex: '#f2c230', name: 'Oro' }, { hex: '#f5ead2', name: 'Crema' }, { hex: '#1b2f6b', name: 'Marino' }, { hex: '#d62839', name: 'Rojo' }])),
       h('div', { class: 'field' }, h('label', null, 'Estilo'), h('div', { class: 'seg' }, LOGO_STYLES.map(st => h('button', { type: 'button', class: (D.logo.style || 'lleno') === st.id ? 'on' : '', onclick: () => { D.logo.style = st.id; render(); } }, st.name)))),
       h('div', { class: 'field' }, h('label', null, 'Forma del logotipo'), h('div', { class: 'shape-row' }, LOGO_SHAPES.map(sh => { const b = h('button', { type: 'button', class: 'shape-btn' + (D.logo.shape === sh.id ? ' on' : ''), title: sh.name, onclick: () => { D.logo.shape = sh.id; render(); } }); b.innerHTML = logoSVG(Object.assign({}, D.logo, { shape: sh.id, text: D.short }), D.color, D.color2, 40); return b; }))),
-      h('div', { class: 'field' }, h('label', null, 'Símbolo'), h('div', { 'data-sk': 'icons', class: 'icon-groups' }, LOGO_ICON_GROUPS.map(g => h('div', null, h('div', { class: 'small muted icon-group-name' }, g.name),
-        h('div', { class: 'icon-grid' }, g.ids.map(ic => { const b = h('button', { type: 'button', class: 'icon-btn logo-pick' + (D.logo.icon === ic ? ' on' : ''), title: logoIconName(ic), 'aria-label': logoIconName(ic), onclick: () => { D.logo.icon = ic; render(); } });
-          b.innerHTML = logoSVG(Object.assign({}, D.logo, { icon: ic, text: D.short || 'AB' }), D.color, D.color2, 34); return b; })))))),
+      symbolField(D),
       h('h2', { style: { marginTop: '18px' } }, 'Tu candidato o candidata'),
       h('div', { class: 'field' }, h('label', { for: 'cn' }, 'Nombre'), h('input', { id: 'cn', type: 'text', maxlength: 30, value: D.candidate.name, oninput: e => { D.candidate.name = e.target.value; upd(); } })),
       h('div', { class: 'row' }, btn('Cara al azar', () => { D.candidate.face = randomFace(); render(); }, { icon: 'dices', size: 'sm' })),
@@ -298,7 +337,111 @@ function districtResults(r) {
       : 'Cada cantón es una circunscripción que reparte sus escaños por D\'Hondt entre los partidos que superan el umbral.';
   return h('div', null, h('p', { class: 'muted small' }, intro), h('div', { class: 'stack' }, rows));
 }
+// ---------- Noche electoral ----------
+// Los resultados llegan localidad a localidad: primero los pueblos pequeños, al final las ciudades. Mientras tanto,
+// el mapa se pinta con el ganador de cada sitio y la proyección de escaños va cambiando.
+const NIGHT_SECONDS = { nacional: 42, cantonal: 32 };
+const placeHash = k => { let x = 0; for (let i = 0; i < k.length; i++) x = (x * 31 + k.charCodeAt(i)) % 9973; return x / 9973; };
+function nightState() {
+  const en = V.electionNow || { national: true, cantonal: true };
+  const level = en.national ? 'nacional' : 'cantonal';
+  const src = level === 'nacional' ? V.parliament.lastElection : V.cantonalNight;
+  if (!src || !src.places || !src.places.length || (src.turn != null && src.turn !== V.turn)) return null;
+  const key = V.turn + '|' + level + '|' + src.places.length;
+  if (!UI.night || UI.night.key !== key) {
+    const order = src.places.slice().sort((a, b) => a.e * (0.75 + 0.5 * placeHash(a.k)) - b.e * (0.75 + 0.5 * placeHash(b.k)));
+    UI.night = { key, level, src, order, start: Date.now(), T: NIGHT_SECONDS[level] * 1000, shown: -1, done: false, totalE: sum(order, p => p.e) };
+    UI.viewOverride = 'map';
+  }
+  return UI.night;
+}
+// Cuántas localidades se han escrutado ya (las pequeñas van deprisa; las ciudades, al final)
+function nightCount(N) {
+  if (N.done) return N.order.length;
+  const t = clamp((Date.now() - N.start) / N.T, 0, 1);
+  return Math.min(N.order.length, Math.floor(N.order.length * Math.pow(t, 0.85) + (t >= 1 ? 1 : 0)));
+}
+function nightTally(N, n) {
+  const pl = N.order.slice(0, n);
+  const votes = {}, byC = V.cantons.map(() => ({ votes: {}, e: 0, n: 0 }));
+  let e = 0, voters = 0;
+  V.players.forEach(p => { votes[p.id] = 0; byC.forEach(b => b.votes[p.id] = 0); });
+  for (const x of pl) { e += x.e; voters += x.n; const b = byC[x.c]; if (b) { b.e += x.e; b.n += x.n; } for (const k in x.v) { votes[k] = (votes[k] || 0) + x.v[k]; if (b) b.votes[k] = (b.votes[k] || 0) + x.v[k]; } }
+  const cTot = V.cantons.map((c, i) => sum(N.order.filter(x => x.c === i), x => x.e));
+  return { votes, byC, e, voters, pct: e / Math.max(1, N.totalE), cTot };
+}
+// Proyección de escaños con lo escrutado
+function nightSeats(N, T) {
+  const seats = {}; V.players.forEach(p => seats[p.id] = 0);
+  const sys = (N.src && N.src.system) || V.pol.sistemaElectoral, th = N.level === 'nacional' ? ((N.src && N.src.threshold) ?? V.pol.umbral) : (N.src.threshold || 0.03);
+  if (N.level === 'cantonal') return V.cantons.map((c, i) => c.merged || !T.byC[i].n ? null : dhondt(T.byC[i].votes, c.parliament.seats, th));
+  if (sys === 'proporcional_nacional') Object.assign(seats, dhondt(T.votes, V.parliament.seats, th));
+  else V.cantons.forEach((c, i) => {
+    if (c.merged || !T.byC[i].n) return;
+    // (en el sistema mayoritario, el que gana en un sitio se lleva casi todo: se aproxima exagerando las diferencias)
+    const vv = sys === 'mayoritario' ? Object.fromEntries(Object.entries(T.byC[i].votes).map(([k, v]) => [k, v * v])) : T.byC[i].votes;
+    const r = dhondt(vv, c.nationalSeats, sys === 'mayoritario' ? 0 : th);
+    for (const k in r) seats[k] = (seats[k] || 0) + r[k];
+  });
+  return seats;
+}
+function placeLabel(x) {
+  if (x.nm) return x.nm;
+  const [q, r] = x.k.split(',').map(Number), hx = MapScene.hexAt(q, r);
+  const c = V.cantons[x.c];
+  return hx && hx.cn ? hx.cn : 'Zona rural de ' + (c ? c.name : '?');
+}
+function nightPanel(N) {
+  const n = nightCount(N), T = nightTally(N, n), seats = nightSeats(N, T);
+  const tv = sum(Object.values(T.votes)) || 1;
+  const last = N.order.slice(Math.max(0, n - 6), n).reverse();
+  const winnerOf = x => { let b = null, bv = -1; for (const k in x.v) if (x.v[k] > bv) { bv = x.v[k]; b = k; } return b; };
+  const parties = V.players.slice().sort((a, b) => (T.votes[b.id] || 0) - (T.votes[a.id] || 0));
+  const body = N.level === 'nacional'
+    ? h('table', { class: 'tbl night-tbl' }, h('thead', null, h('tr', null, h('th', null, 'Partido'), h('th', { class: 'r' }, '%'), h('th', { class: 'r' }, 'Escaños (proyección)'))),
+      h('tbody', null, parties.map(p => h('tr', null, h('td', null, chip(p, { small: true })), h('td', { class: 'r num' }, fmt.pct((T.votes[p.id] || 0) / tv)),
+        h('td', { class: 'r num' }, h('div', { class: 'night-bar' }, h('i', { style: { width: Math.min(100, (seats[p.id] || 0) / Math.max(1, V.parliament.seats) * 200) + '%', background: p.color } }), h('b', null, String(seats[p.id] || 0))))))))
+    : h('div', { class: 'stack' }, liveCantonsV().map(c => {
+        const b = T.byC[c.idx], cs = seats[c.idx], tvc = sum(Object.values(b.votes)) || 1;
+        const lead = V.players.filter(p => (b.votes[p.id] || 0) > 0).sort((x, y) => b.votes[y.id] - b.votes[x.id]);
+        return h('div', { class: 'canton-row' }, h('div', { class: 'row' }, h('b', null, c.name), h('span', { class: 'spacer' }), h('span', { class: 'muted small' }, 'escrutado ' + fmt.pct(b.e / Math.max(1, T.cTot[c.idx]), 0))),
+          cs ? miniHemicycle(cs, c.parliament.seats, V.players) : h('p', { class: 'muted small' }, 'Aún no hay datos.'),
+          h('div', { class: 'small' }, lead.slice(0, 4).map(p => h('span', { class: 'tag', style: { borderColor: p.color } }, `${p.short} ${fmt.pct(b.votes[p.id] / tvc, 0)}`))));
+      }));
+  return h('div', { class: 'dock right wide glass night', 'data-sk': 'night' },
+    h('h2', null, icon('vote', { size: 20 }), N.level === 'nacional' ? ' Noche electoral: generales' : ' Noche electoral: cantonales'),
+    h('div', { class: 'night-prog' }, h('div', { class: 'row small' }, h('b', null, 'Escrutado ' + fmt.pct(T.pct, 1)), h('span', { class: 'spacer' }), h('span', { class: 'muted' }, `${n} de ${N.order.length} localidades · participación ${fmt.pct(T.voters / Math.max(1, T.e), 0)}`)),
+      h('div', { class: 'bar' }, h('i', { style: { width: (T.pct * 100) + '%' } }))),
+    body,
+    last.length ? section('Últimos datos', h('ul', { class: 'log night-log' }, last.map(x => { const w = P(winnerOf(x)); return h('li', null, h('span', null, h('b', null, placeLabel(x)), h('span', { class: 'muted' }, ` · ${fmt.int(x.n)} votos`)), w ? chip(w, { small: true, short: true, sub: fmt.pct((x.v[w.id] || 0) / Math.max(1, x.n), 0) }) : null); }))) : null,
+    h('div', { class: 'btn-row' }, btn('Ver el resultado final', () => { N.done = true; finishNight(); }, { kind: 'ghost', size: 'sm', icon: 'skip-forward' })));
+}
+// Colores del mapa durante la noche: cada localidad escrutada, del color de quien gana allí
+function nightMapColors(N, n) {
+  const m = new Map();
+  for (const x of N.order.slice(0, n)) { let b = null, bv = -1; for (const k in x.v) if (x.v[k] > bv) { bv = x.v[k]; b = k; } const p = P(b); if (p) (x.ks || [x.k]).forEach(k => m.set(k, p.color)); }
+  return m;
+}
+function finishNight() {
+  const N = UI.night; if (!N) return;
+  N.done = true; N.shown = N.order.length;
+  MapScene.setNight(nightMapColors(N, N.order.length));
+  UI.viewOverride = 'chamber';
+  render();
+}
+function tickNight() {
+  const N = UI.night; if (!N || N.done || !V || V.phase !== 'election') return;
+  const n = nightCount(N);
+  if (n !== N.shown) {
+    N.shown = n;
+    MapScene.setNight(nightMapColors(N, n));
+    if (n >= N.order.length) { finishNight(); return; }
+    renderRegion('side');
+  }
+}
 function phaseElection() {
+  const N0 = nightState();
+  if (N0 && !N0.done) return { side: nightPanel(N0) };
   const r = V.parliament.lastElection;
   const en = V.electionNow || { national: true, cantonal: true };
   const tabs = [en.national ? ['general', 'Resultado'] : null, en.national ? ['distritos', 'Por circunscripción'] : null, en.cantonal ? ['cantonales', 'Parlamentos cantonales'] : null].filter(Boolean);
@@ -468,6 +611,7 @@ const ACTION_TABS = [['acciones', 'Acciones', 'zap'], ['partido', 'Mi partido', 
 function phaseActions() {
   const p = me();
   const body = { acciones: tabActions, partido: tabParty, hacienda: tabHacienda, leyes: tabLaws, parlamento: tabParliament, encuestas: tabPolls, partidos: tabParties, mundo: tabWorld }[UI.tab] || tabActions;
+  if (UI.road) return { main: roadToolbar(), side: null };
   return {
     main: h('div', { class: 'dock left wide glass', 'data-sk': 'act-' + UI.tab },
       h('div', { class: 'res-bar' }, resPill('Capital político', p.pc + ' PC', 'zap', p.pc < 2 ? 'warn' : ''), resPill('Fondos', fmt.k(p.funds), 'coins', p.funds < 50 ? 'bad' : ''),
@@ -568,6 +712,8 @@ function tabActions(p) {
   if (centers) out.push(centers);
   const pef = pubFirmsPanel(p);
   if (pef) out.push(pef);
+  const rds = roadsPanel(p);
+  if (rds) out.push(rds);
   out.push(group('shady', 'Las cloacas', `Pruebas acumuladas: ${fmt.num(p.evidence, 1)} · riesgo este trimestre: ${fmt.pct(p.detection, 0)}`, h('div', null,
     h('p', { class: 'muted small' }, 'Cada acción turbia deja pruebas. Cada trimestre pueden salir a la luz: más fácil cuantas más pruebas, más instituciones de control y más investigaciones en tu contra. Se olvidan poco a poco.'),
     CORRUPTION_ACTIONS.map(c => {
@@ -580,6 +726,88 @@ function tabActions(p) {
     })), { shady: true, icon: 'eye-off' }));
   return h('div', null, out);
 }
+// ---------- Carreteras y vías de tren ----------
+// Quien tiene la competencia de transporte traza carreteras o vías tocando casillas en el mapa: cada toque añade
+// un tramo por el camino más barato (aprovechando lo que ya hay de esa red y sin pasar por montañas).
+const NET_UI = {
+  road: { icon: 'route', title: 'Nueva carretera', noun: 'carretera', the: 'la carretera', unit: () => V.roadUnit || ROAD_COST, list: () => V.roads || [] },
+  rail: { icon: 'train-front', title: 'Nueva vía de tren', noun: 'vía de tren', the: 'la vía', unit: () => V.railUnit || RAIL_COST, list: () => V.rails || [] },
+};
+function roadsPanel(p) {
+  const owners = V.roadOwners || [];
+  if (!owners.length) return null;
+  if (!owners.some(o => String(o.owner) === String(UI.roadOwner))) UI.roadOwner = owners[0].owner;
+  const ownN = kind => NET_UI[kind].list().filter(k => { const h = MapScene.hexAt(...k.split(',').map(Number)); return h && h.c === 0; }).length;
+  const conn = V.roadConn || [], rail = V.railInfo || [];
+  const mine = liveCantonsV().filter(c => UI.roadOwner === 'estado' || c.idx === UI.roadOwner);
+  const railTxt = c => { const l = (rail[c.idx] || {}).links || 0; return l >= 1 ? `${c.name}: ${l >= 2 ? 'bien conectado' : 'una ciudad'}` : `${c.name}: ${l > 0 ? 'cercanías' : 'sin tren'}`; };
+  return group('roads', 'Carreteras y trenes', `${ownN('road')} casillas de carretera y ${ownN('rail')} de vía en el país`, h('div', null,
+    h('p', { class: 'muted small' }, 'Las carreteras y las vías de tren abaratan el transporte de mercancías entre dos cantones (o dos países) cuando unen sus capitales; el tren, mucho más (pero cuesta dos veces y media más). Las carreteras que llegan a los pueblos mejoran la calidad del transporte del cantón. Las compañías ferroviarias solo venden viajes de verdad si su ciudad está unida por tren con otras. No se puede construir por las montañas.'),
+    owners.length > 1 ? h('div', { class: 'field' }, h('label', null, 'Quién la construye y la paga'), h('select', { onchange: e => { UI.roadOwner = e.target.value === 'estado' ? 'estado' : +e.target.value; render(); } },
+      owners.map(o => h('option', { value: o.owner, selected: String(o.owner) === String(UI.roadOwner) }, o.label)))) : h('p', { class: 'small' }, 'Construye: ', h('b', null, owners[0].label)),
+    actionLine(h('span', null, icon('route', { size: 15 }), ' Trazar una carretera'), 'Toca en el mapa una ciudad, un pueblo o una carretera y luego los sitios por los que quieras que pase.', '1 PC + obra',
+      btn('Abrir el mapa', () => startRoadTool(UI.roadOwner, 'road'), { size: 'sm', kind: 'primary', icon: 'route' })),
+    actionLine(h('span', null, icon('train-front', { size: 15 }), ' Tender una vía de tren'), 'Une ciudades por tren: abarata mucho el transporte y deja trabajar a las compañías ferroviarias. Empieza en una ciudad o en una vía.', '1 PC + obra',
+      btn('Abrir el mapa', () => startRoadTool(UI.roadOwner, 'rail'), { size: 'sm', kind: 'primary', icon: 'train-front' })),
+    h('div', { class: 'small muted' }, 'Pueblos unidos con su capital: ', mine.map(c => `${c.name} ${fmt.pct(conn[c.idx] || 0, 0)}`).join(' · ')),
+    h('div', { class: 'small muted' }, 'Tren: ', mine.map(railTxt).join(' · ')),
+    h('div', { class: 'small muted' }, V.pol.viasPrivadas ? 'La ley permite a las compañías ferroviarias privadas tender sus propias vías.' : 'Solo las Administraciones pueden construir vías (Ley del Sector Público).')), { icon: 'route' });
+}
+function roadPG() {
+  if (!UI._pg || UI._pg.vref !== V) UI._pg = { vref: V, map: Client.map, roads: V.roads || [], rails: V.rails || [], roadVer: 0, railVer: 0, ci: 0, cantons: V.cantons, pol: V.pol, gov: V.gov };
+  return UI._pg;
+}
+function startRoadTool(owner, kind = 'road') {
+  UI.road = { owner, kind, pts: [], path: [] };
+  UI.viewOverride = 'map';
+  MapScene.roadTool = hx => roadToolClick(hx);
+  render();
+  setTimeout(() => { try { MapScene.goLod('hex'); } catch (e) { } }, 50);
+}
+function stopRoadTool() {
+  UI.road = null; MapScene.roadTool = null; MapScene.setRoadPreview(null, null); render();
+}
+function roadToolClick(hx) {
+  const R = UI.road; if (!R) return;
+  const PG = roadPG(), ok = h => roadHexAllowed(PG, R.owner, h), N = NET_UI[R.kind];
+  if (!ok(hx)) { toast(hx.rel === 'montana' ? 'No se puede construir por las montañas.' : 'Esa casilla no es de tu administración.', 'bad'); return; }
+  if (!R.pts.length) { R.pts.push([hx.q, hx.r]); R.path = [[hx.q, hx.r]]; }
+  else {
+    const last = R.pts[R.pts.length - 1];
+    if (last[0] === hx.q && last[1] === hx.r) return;
+    const seg = roadPath(PG, last, [hx.q, hx.r], ok, R.kind);
+    if (!seg) { toast(`No hay camino posible para ${N.the} hasta ahí (montañas, mar o fuera de tu territorio).`, 'bad'); return; }
+    R.pts.push([hx.q, hx.r]); R.segs = (R.segs || []).concat([seg.length - 1]);
+    R.path = R.path.concat(seg.slice(1));
+  }
+  MapScene.setRoadPreview(R.path, R.pts, R.kind);
+  render();
+}
+function roadUndo() {
+  const R = UI.road; if (!R || !R.pts.length) return;
+  if (R.pts.length === 1) { R.pts = []; R.path = []; }
+  else { const n = R.segs.pop(); R.pts.pop(); R.path = R.path.slice(0, R.path.length - n); }
+  MapScene.setRoadPreview(R.path, R.pts, R.kind); render();
+}
+function roadToolbar() {
+  const R = UI.road, PG = roadPG(), N = NET_UI[R.kind];
+  const q = roadQuote(PG, R.path, R.kind);
+  const cost = sum(q.fresh, h => roadTerrainMult(h, R.kind)) * N.unit();
+  const owner = (V.roadOwners || []).find(o => String(o.owner) === String(R.owner));
+  const p = me();
+  const tooLong = q.fresh.length > ROAD_MAX_HEXES;
+  const rail = R.kind === 'rail';
+  return h('div', { class: 'dock left glass road-tool' + (rail ? ' rail' : '') },
+    h('div', { class: 'row' }, h('h2', { class: 'grow' }, icon(N.icon, { size: 20 }), ' ', N.title), btn('', stopRoadTool, { kind: 'ghost', size: 'sm', icon: 'x', title: 'Cancelar' })),
+    h('p', { class: 'muted small' }, owner ? owner.label + '. ' : '', R.pts.length ? `Toca otra casilla para alargarla: el tramo va por el camino más barato y aprovecha ${rail ? 'las vías' : 'las carreteras'} que ya hay.` : `Toca en el mapa la casilla donde empieza (mejor una ciudad${rail ? ' o una vía' : ', un pueblo o una carretera'}).`),
+    h('div', { class: 'grid2' }, stat('Casillas nuevas', String(q.fresh.length), { icon: N.icon }), stat('Coste de la obra', fmt.bn(cost), { icon: 'coins' })),
+    tooLong ? h('div', { class: 'notice bad' }, `Como mucho ${ROAD_MAX_HEXES} casillas nuevas por obra: divídela en varias.`) : null,
+    h('p', { class: 'small muted' }, rail ? 'Las colinas (sobre todo), los bosques, los ríos (puentes) y las rocas encarecen la obra. Para que sirva, la vía tiene que llegar a otra ciudad. Lo paga ' : 'Las colinas, los bosques, los ríos (puentes) y las rocas encarecen la obra. Lo paga ', owner && owner.owner === 'estado' ? 'el Estado' : 'el cantón', '. Vista de casillas: acerca la cámara si no ves bien el terreno.'),
+    h('div', { class: 'btn-row' },
+      btn('Deshacer tramo', roadUndo, { size: 'sm', kind: 'ghost', icon: 'undo-2', disabled: !R.pts.length }),
+      btn('Construir · 1 PC', async () => { const r = await act({ type: 'road', kind: R.kind, owner: R.owner, hexes: R.path }); if (r && r.ok) stopRoadTool(); }, { kind: 'primary', icon: 'check', disabled: !q.fresh.length || tooLong || p.pc < 1 })));
+}
+
 // ---------- Centros públicos ----------
 // Hospitales, centros de salud, colegios, universidades, comisarías y cuarteles de los gobiernos que controla el
 // jugador. Una pestaña por materia y gobierno; en cada una: cómo va el presupuesto, los centros (con su ficha para
@@ -816,7 +1044,7 @@ function peScopeView(p, sc) {
   UI.peNew = UI.peNew || {};
   const st = UI.peNew[sc.owner] || (UI.peNew[sc.owner] = { kind: 'electrica', place: '' });
   const K = FIRM_KINDS[st.kind];
-  const grp = k => ({ muebles: 'manuf', textil: 'manuf', maquinaria: 'manuf', armamento: 'manuf' })[k] || k;
+  const grp = k => ({ muebles: 'manuf', textil: 'manuf', maquinaria: 'manuf', armamento: 'manuf', automovilistica: 'manuf' })[k] || k;
   const used = {}; V.firms.forEach(f => { if (f.x != null || f.q == null || (f.pub != null && !f.pe)) return; const k = f.q + ',' + f.r + ':' + grp(f.k); used[k] = (used[k] || 0) + 1; });
   const places = Client.map.hexes.filter(x => x.c === 0 && x.k >= 0 && (sc.owner === 'estado' || x.k === sc.owner) && slotRule(st.kind, x, 0) > (used[x.q + ',' + x.r + ':' + grp(st.kind)] || 0))
     .sort((a, b) => a.k - b.k || (a.cn || '').localeCompare(b.cn || ''));
@@ -1369,7 +1597,7 @@ const CANTON_METRICS = [
 // Un terreno (casilla del mapa): relieve, lo que contiene, a quién pertenece y a qué aporta
 // Un terreno (casilla del mapa): resumen, recursos naturales y edificios
 const NATURAL_FEATS = ['cultivo', 'bosque', 'rio', 'mina', 'carbon', 'pesca'];
-const BUILT_FEATS = ['capital', 'ciudad', 'pueblo', 'fabrica', 'puerto'];
+const BUILT_FEATS = ['capital', 'ciudad', 'pueblo', 'fabrica', 'puerto', 'carretera'];
 const NATURAL_DESC = {
   cultivo: 'Tierra de cultivo: alimenta la agricultura del cantón.', bosque: 'Madera, caza y paisaje.', rio: 'Agua para regar, beber y producir energía.',
   mina: 'Yacimiento de metal: permite una mina de metal.', carbon: 'Yacimiento de carbón: permite una mina de carbón.', pesca: 'Banco de pesca.',
@@ -1387,7 +1615,7 @@ function hexData(hx) {
 }
 function hexInspector(hx, tab) {
   const T = TERRAIN3D[hx.t], sea = hx.t === 'mar';
-  const feats = (hx.f || []).filter(k => HEX_FEATURES[k]);
+  const feats = (hx.f || []).concat((V.roads || []).includes(hx.q + ',' + hx.r) ? ['carretera'] : [], (V.rails || []).includes(hx.q + ',' + hx.r) ? ['via'] : []).filter(k => HEX_FEATURES[k]);
   const fname = i => i === 0 ? V.country.name : (V.foreign.find(f => f.mapIndex === i) || {}).name || '?';
   const sub = h('p', { class: 'muted small hex-sub' }, sea ? (hx.d === 1 ? 'Aguas costeras' : hx.d === 2 ? 'Aguas cercanas a la costa' : 'Mar abierto') : `${T.desc[0].toUpperCase() + T.desc.slice(1)} · ${RELIEF3D[hx.rel].name.toLowerCase()}${hx.coast ? ' · costa' : ''}`);
   const hasHomes = hx.nh || (hx.bb && hx.bb.length);
@@ -1405,7 +1633,7 @@ function hexInspector(hx, tab) {
   // resumen
   // qué empresas podrían instalarse aquí
   const kindsHere = sea ? (feats.includes('pesca') ? ['pesca'] : []) : Object.keys(FIRM_KINDS).filter(k => k !== 'policia' && slotRule(k, Object.assign({}, hx, { c: 0 })) > 0);
-  const yields = [...new Set(kindsHere.map(k => ({ agricultura: 'agricultura', ganaderia: 'ganadería', pesca: 'pesca', silvicultura: 'madera', muebles: 'industria del mueble', textil: 'industria textil', sanidad: 'clínicas', educacion: 'colegios', banco: 'bancos', constructora: 'constructoras', cantera: 'canteras', minaMetal: 'minas de metal', minaCarbon: 'minas de carbón', maquinaria: 'fábricas de máquinas', armamento: 'fábricas de armas', electrica: 'centrales eléctricas', telecom: 'telecomunicaciones', medios: 'medios de comunicación', gimnasio: 'gimnasios', alimentacion: 'industria alimentaria', comercio: 'pequeño comercio' })[k]))];
+  const yields = [...new Set(kindsHere.map(k => ({ agricultura: 'agricultura', ganaderia: 'ganadería', pesca: 'pesca', silvicultura: 'madera', muebles: 'industria del mueble', textil: 'industria textil', sanidad: 'clínicas', educacion: 'colegios', banco: 'bancos', constructora: 'constructoras', cantera: 'canteras', minaMetal: 'minas de metal', minaCarbon: 'minas de carbón', maquinaria: 'fábricas de máquinas', armamento: 'fábricas de armas', automovilistica: 'fábricas de automóviles', ferroviaria: 'ferrocarriles', electrica: 'centrales eléctricas', telecom: 'telecomunicaciones', medios: 'medios de comunicación', gimnasio: 'gimnasios', alimentacion: 'industria alimentaria', comercio: 'pequeño comercio' })[k]))];
   if (data && data.housingOk) yields.push('viviendas');
   let owner;
   if (sea) owner = hx.dz ? h('div', null, h('p', null, h('b', null, 'Aguas en disputa'), ` entre ${fname(hx.dz[0])} y ${fname(hx.dz[1])}: están a la misma distancia de la costa de los dos países.`))
@@ -1546,7 +1774,7 @@ function laborView(L) {
     h('p', { class: 'small muted' }, 'Especializarse lleva 4 trimestres. Se elige la que mejor se paga, si alguna se paga mejor que los empleos sin cualificar. Quien tiene una solo trabaja de ella, de académico o en un empleo sin cualificar.'));
 }
 // La cesta de cada nivel de vida (por adulto y trimestre; los menores cuentan medio)
-const NEED_SHORT = { comida: 'alimentos', lujo: 'de lujo', ropaS: 'ropa sencilla', ropa: 'ropa', enseres: 'enseres', hogar: 'hogar', calor: 'calefacción', ocio: 'ocio', salud: 'salud' };
+const NEED_SHORT = { transporte: 'transporte', comida: 'alimentos', lujo: 'de lujo', ropaS: 'ropa sencilla', ropa: 'ropa', enseres: 'enseres', hogar: 'hogar', calor: 'calefacción', ocio: 'ocio', salud: 'salud' };
 function basketList() {
   const n = v => fmt.num(v, 2).replace(/,?0+$/, '');
   return h('details', { class: 'basket-list' }, h('summary', { class: 'small' }, icon('shopping-basket', { size: 13 }), ' Qué pide la cesta de cada nivel'),

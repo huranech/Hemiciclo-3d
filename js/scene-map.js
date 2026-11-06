@@ -19,7 +19,7 @@ const HEX_FEATURES = {
   capital: { name: 'Capital del país', icon: 'landmark' }, ciudad: { name: 'Ciudad', icon: 'building-2' }, pueblo: { name: 'Pueblo', icon: 'house' },
   fabrica: { name: 'Fábricas', icon: 'factory' }, puerto: { name: 'Puerto', icon: 'anchor' }, cultivo: { name: 'Campos de cultivo', icon: 'wheat' },
   bosque: { name: 'Bosque', icon: 'trees' }, rio: { name: 'Río', icon: 'waves' }, mina: { name: 'Yacimiento de metal', icon: 'pickaxe' }, carbon: { name: 'Yacimiento de carbón', icon: 'flame' },
-  pesca: { name: 'Banco de pesca', icon: 'fish' },
+  pesca: { name: 'Banco de pesca', icon: 'fish' }, carretera: { name: 'Carretera', icon: 'route' }, via: { name: 'Vía de tren', icon: 'train-front' },
 };
 // A qué sector de la economía aporta cada cosa
 const HEX_YIELDS = {
@@ -168,6 +168,9 @@ const MapScene = {
     this.hexMesh = mesh; this.world.add(mesh);
     this.buildDecor();
     this.buildRivers();
+    this.roadSig = null; this.roadGroup = null; this.roadPrev = null; this.railSig = null; this.railGroup = null;
+    if (this.view && this.view.roads) { this.roadSig = (this.view.roads.length) + ':' + (this.view.roads[this.view.roads.length - 1] || ''); this.buildRoads(this.view.roads); }
+    if (this.view && this.view.rails) { this.railSig = (this.view.rails.length) + ':' + (this.view.rails[this.view.rails.length - 1] || ''); this.buildRails(this.view.rails); }
     // --- ciudades con nombre (capitales cantonales) ---
     this.cityAnchors = {};
     this.buildCities();
@@ -247,6 +250,113 @@ const MapScene = {
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: '#3d8fd0', side: THREE.DoubleSide }));
     this.world.add(m);
+  },
+  // Carreteras: cintas oscuras del centro de cada casilla al lado por el que sigue (hacia otra carretera, una
+  // ciudad o un pueblo). key: lista de casillas 'q,r'; opts.preview: trazado provisional (naranja, por encima)
+  roadMesh(keys, opts = {}) {
+    const set = new Set(keys), pos = [], W = opts.preview ? 0.12 : 0.085, lift = opts.preview ? 0.06 : 0.03;
+    const settle = info => info && (info.f.includes('ciudad') || info.f.includes('capital') || info.f.includes('pueblo'));
+    const quad = (ax, ay, az, bx, by, bz, w) => { const dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz) || 1, nx = -dz / l * w, nz = dx / l * w; pos.push(ax + nx, ay, az + nz, bx + nx, by, bz + nz, bx - nx, by, bz - nz, ax + nx, ay, az + nz, bx - nx, by, bz - nz, ax - nx, ay, az - nz); };
+    const disc = (x, y, z, w) => { for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k, b = Math.PI / 3 * (k + 1); pos.push(x, y, z, x + Math.cos(b) * w, y, z + Math.sin(b) * w, x + Math.cos(a) * w, y, z + Math.sin(a) * w); } };
+    const touch = new Set();
+    keys.forEach(key => {
+      const info = this.byKey.get(key); if (!info) return;
+      const y = info.h + lift;
+      const nbs = HEX.neighbors(info.hex.q, info.hex.r);
+      let any = false;
+      nbs.forEach(([q, r], k) => {
+        const nk = q + ',' + r, n = this.byKey.get(nk);
+        if (!n || !n.land) return;
+        const linked = set.has(nk) || (!opts.preview && (this.roadKeys || new Set()).has(nk)) || (opts.preview && (opts.net || new Set()).has(nk)) || settle(n);
+        if (!linked) return;
+        any = true;
+        // (hasta el punto medio del lado que da a ese vecino)
+        const mx = (n.x + info.x) / 2, mz = (n.z + info.z) / 2, my = Math.max(info.h, n.h) + lift;
+        quad(info.x, y, info.z, mx, my, mz, W);
+        if (settle(n) && !set.has(nk)) touch.add(nk + '|' + key);
+      });
+      disc(info.x, y, info.z, W * 1.1);
+      if (!any) disc(info.x, y, info.z, W * 1.6);
+    });
+    // el último tramo dentro de las ciudades y pueblos que toca la carretera
+    touch.forEach(t => {
+      const [sk, rk] = t.split('|'), s = this.byKey.get(sk), r = this.byKey.get(rk); if (!s || !r) return;
+      const mx = (s.x + r.x) / 2, mz = (s.z + r.z) / 2, my = Math.max(s.h, r.h) + lift;
+      quad(mx, my, mz, s.x + (mx - s.x) * 0.25, s.h + lift, s.z + (mz - s.z) * 0.25, W);
+    });
+    if (!pos.length) return null;
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: opts.preview ? (opts.rail ? '#c084fc' : '#ff9f43') : '#45444a', side: THREE.DoubleSide, transparent: !!opts.preview, opacity: opts.preview ? 0.92 : 1, depthTest: !opts.preview }));
+    if (opts.preview) m.renderOrder = 4;
+    return m;
+  },
+  buildRoads(keys) {
+    if (this.roadGroup) { this.world.remove(this.roadGroup); this.roadGroup.geometry.dispose(); this.roadGroup = null; }
+    this.roadKeys = new Set(keys);
+    const m = this.roadMesh(keys);
+    if (m) { this.roadGroup = m; this.world.add(m); }
+  },
+  // Vías de tren: balasto con traviesas y dos raíles, del centro de cada casilla al lado por el que sigue (hacia
+  // otra vía, una ciudad o un pueblo, donde está la estación)
+  buildRails(keys) {
+    if (this.railGroup) { this.world.remove(this.railGroup); this.railGroup.geometry.dispose(); this.railGroup = null; }
+    this.railKeys = new Set(keys);
+    if (!keys.length) return;
+    const pos = [], col = [], lift = 0.045;
+    const C = { bal: new THREE.Color('#8a7a68'), tie: new THREE.Color('#4a3426'), rail: new THREE.Color('#e3e7ee') };
+    const settle = info => info && (info.f.includes('ciudad') || info.f.includes('capital') || info.f.includes('pueblo'));
+    const tri = (pts, c) => { pts.forEach(p => { pos.push(p[0], p[1], p[2]); col.push(c.r, c.g, c.b); }); };
+    // banda de ancho w desplazada off a la izquierda del tramo a→b
+    const band = (ax, ay, az, bx, by, bz, w, off, c) => {
+      const dx = bx - ax, dz = bz - az, l = Math.hypot(dx, dz) || 1, px = -dz / l, pz = dx / l;
+      const o1 = off + w, o0 = off - w;
+      const A1 = [ax + px * o1, ay, az + pz * o1], B1 = [bx + px * o1, by, bz + pz * o1], B0 = [bx + px * o0, by, bz + pz * o0], A0 = [ax + px * o0, ay, az + pz * o0];
+      tri([A1, B1, B0], c); tri([A1, B0, A0], c);
+    };
+    const seg = (ax, ay, az, bx, by, bz) => {
+      band(ax, ay, az, bx, by, bz, 0.07, 0, C.bal);
+      const l = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(l / 0.13));
+      for (let k = 0; k < n; k++) {
+        const t0 = (k + 0.3) / n, t1 = (k + 0.62) / n;
+        band(ax + (bx - ax) * t0, ay + (by - ay) * t0 + 0.004, az + (bz - az) * t0, ax + (bx - ax) * t1, ay + (by - ay) * t1 + 0.004, az + (bz - az) * t1, 0.06, 0, C.tie);
+      }
+      band(ax, ay + 0.008, az, bx, by + 0.008, bz, 0.007, 0.032, C.rail);
+      band(ax, ay + 0.008, az, bx, by + 0.008, bz, 0.007, -0.032, C.rail);
+    };
+    keys.forEach(key => {
+      const info = this.byKey.get(key); if (!info) return;
+      const y = info.h + lift;
+      HEX.neighbors(info.hex.q, info.hex.r).forEach(([q, r]) => {
+        const nk = q + ',' + r, n = this.byKey.get(nk);
+        if (!n || !n.land || !(this.railKeys.has(nk) || settle(n))) return;
+        const mx = (n.x + info.x) / 2, mz = (n.z + info.z) / 2, my = Math.max(info.h, n.h) + lift;
+        seg(info.x, y, info.z, mx, my, mz);
+        // (y dentro de la ciudad o el pueblo, hasta su estación)
+        if (settle(n) && !this.railKeys.has(nk)) seg(mx, my, mz, n.x + (mx - n.x) * 0.3, n.h + lift, n.z + (mz - n.z) * 0.3);
+      });
+      // nudo en el centro de la casilla
+      for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k, b = Math.PI / 3 * (k + 1), w = 0.075; tri([[info.x, y, info.z], [info.x + Math.cos(b) * w, y, info.z + Math.sin(b) * w], [info.x + Math.cos(a) * w, y, info.z + Math.sin(a) * w]], C.bal); }
+    });
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+    this.railGroup = m; this.world.add(m);
+  },
+  // Trazado provisional de la herramienta de carreteras y vías (y las casillas donde se ha tocado)
+  setRoadPreview(path, pts, kind = 'road') {
+    if (this.roadPrev) { this.world.remove(this.roadPrev); this.roadPrev.traverse(o => o.geometry && o.geometry.dispose()); this.roadPrev = null; }
+    if (!this.byKey || (!(path || []).length && !(pts || []).length)) return;
+    const grp = new THREE.Group();
+    const rail = kind === 'rail';
+    const m = (path || []).length ? this.roadMesh(path.map(([q, r]) => q + ',' + r), { preview: true, rail, net: rail ? this.railKeys : this.roadKeys }) : null;
+    if (m) grp.add(m);
+    const ring = new THREE.RingGeometry(0.55, 0.75, 6, 1, Math.PI / 6); ring.rotateX(-Math.PI / 2);
+    (pts || []).forEach(([q, r], i) => {
+      const info = this.byKey.get(q + ',' + r); if (!info) return;
+      const rm = new THREE.Mesh(ring, new THREE.MeshBasicMaterial({ color: i === 0 ? '#ffd166' : rail ? '#c084fc' : '#ff9f43', depthTest: false, transparent: true, opacity: 0.95 }));
+      rm.position.set(info.x, info.h + 0.08, info.z); rm.renderOrder = 6; grp.add(rm);
+    });
+    this.roadPrev = grp; this.world.add(grp);
   },
   buildCities() {
     const cs = (this.view && this.view.cantons) || [];
@@ -427,6 +537,10 @@ const MapScene = {
   setData(view) {
     const first = !this.view && this.mapRef;
     this.view = view;
+    const rsig = (view.roads || []).length + ':' + ((view.roads || [])[(view.roads || []).length - 1] || '');
+    if (this.byKey && rsig !== this.roadSig) { this.roadSig = rsig; this.buildRoads(view.roads || []); }
+    const tsig = (view.rails || []).length + ':' + ((view.rails || [])[(view.rails || []).length - 1] || '');
+    if (this.byKey && tsig !== this.railSig) { this.railSig = tsig; this.buildRails(view.rails || []); }
     // viviendas construidas durante la partida: se apuntan en el mapa
     if (this.byKey && view.bld) view.bld.forEach(b => { const info = this.byKey.get(b.q + ',' + b.r); if (info) { info.hex.nh = b.nh || undefined; info.hex.bb = b.bb && b.bb.length ? b.bb : undefined; } });
     if (first || (this.mapRef && !this.cityAnchors)) this.buildWorld(this.mapRef);
@@ -523,6 +637,8 @@ const MapScene = {
         case 'comercio': add('shopBody', [x, y, z, 0.22, 0.13, 0.17, ry]); add('awning', [x, y + 0.1, z, 0.24, 0.035, 0.19, ry]); break;
         case 'telecom': add('clinic', [x, y, z, 0.16, 0.12, 0.14, ry]); add('antenna', [x + Math.cos(a + 1.6) * 0.12, y, z + Math.sin(a + 1.6) * 0.12, 1, 1, 1, 0]); break;
         case 'medios': add('media', [x, y, z, 0.24, 0.2, 0.2, ry]); add('dish', [x, y + 0.22, z, 1, 1, 1, 0]); break;
+        case 'automovilistica': add('carPlant', [x, y, z, 0.48, 0.2, 0.3, ry]); add('roofDark', [x, y + 0.2, z, 0.5, 0.08, 0.32, ry]); for (let t = 0; t < 2; t++) add('carMini', [x + Math.cos(a + 1.6) * (0.22 + t * 0.12), y, z + Math.sin(a + 1.6) * (0.22 + t * 0.12), 0.1, 0.05, 0.06, ry]); break;
+        case 'ferroviaria': add('station', [x, y, z, 0.4, 0.14, 0.18, ry]); add('roofRed', [x, y + 0.14, z, 0.42, 0.07, 0.2, ry]); add('rail', [x + Math.cos(a + 1.6) * 0.18, y, z + Math.sin(a + 1.6) * 0.18, 0.62, 0.02, 0.07, ry]); add('trainCar', [x + Math.cos(a + 1.6) * 0.18, y + 0.02, z + Math.sin(a + 1.6) * 0.18, 0.3, 0.08, 0.07, ry]); break;
         case 'comisaria': add('police', [x, y, z, 0.24, 0.16, 0.2, ry]); add('beacon', [x, y + 0.18, z, 1, 1, 1, 0]); break;
         case 'cuartel': add('barracks', [x, y, z, 0.5, 0.12, 0.36, ry]); add('flag', [x + Math.cos(a + 1.6) * 0.22, y, z + Math.sin(a + 1.6) * 0.22, 1, 1, 1, 0]); break;
       }
@@ -550,6 +666,7 @@ const MapScene = {
       machineWorks: [G3.box, M('#8fa0b8')], arms: [G3.box, M('#6b6b3a')], plant: [G3.box, M('#c9ccd2')], tower: [G3.tower, M('#e8e8ea')],
       gym: [G3.box, M('#7fb0c9')], foodPlant: [G3.box, M('#e3b87a')], shopBody: [G3.box, M('#efe2b4')], awning: [G3.box, M('#c94f6d')],
       antenna: [G3.antenna, M('#d04a3a')], media: [G3.box, M('#c86fd0')], dish: [G3.dish, M('#f2f2f2')],
+      carPlant: [G3.box, M('#c9cdd6')], carMini: [G3.box, M('#d0453a')], station: [G3.box, M('#e8d9b8')], rail: [G3.box, M('#5a5650')], trainCar: [G3.box, M('#3f6fc9')],
       police: [G3.box, M('#3f5f9a')], beacon: [G3.beacon, std('#5aa0ff', { emissive: '#2a5aff', emissiveIntensity: 0.8 })], barracks: [G3.box, M('#8a8458')],
     };
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e3 = new THREE.Euler();
@@ -568,6 +685,8 @@ const MapScene = {
     }
   },
   setMode(mode) { if (MAP_MODES[mode]) { this.mode = mode; this.applyMode(); } },
+  // Noche electoral: localidades escrutadas del color del ganador; el resto del país, apagado
+  setNight(colors) { this.night = colors || null; this.applyMode(); },
   cantonColor(c) {
     const v = this.view; const M = MAP_MODES[this.mode];
     if (this.mode === 'gobierno') { const p = v.players.find(x => x.id === c.gov.president); return p ? C3(p.color) : C3('#6a7598'); }
@@ -610,6 +729,10 @@ const MapScene = {
         const fg = h.c > 0 && fgov[h.c];
         if (fg) { const gc = (h.k >= 0 && fg.cant[h.k]) || fg.nat; if (gc) col = gc.clone().lerp(info.base, 0.35).offsetHSL(0, -0.1, -0.05); }
         if (h.c === 0 && cc[h.k]) col = cc[h.k].clone().lerp(info.base, this.mode === 'gobierno' || this.mode === 'voto' ? 0.22 : 0.12);
+      }
+      if (this.night && h.c === 0 && info.land) {
+        const nc = this.night.get(h.q + ',' + h.r);
+        col = nc ? C3(nc).lerp(info.base, 0.12) : info.base.clone().offsetHSL(0, -0.35, 0).lerp(dim, 0.72);
       }
       if (this.lod === 'cantones' && h.c === 0 && info.land) {
         if (this.selected === h.k) col.offsetHSL(0, 0, 0.07);
@@ -700,6 +823,8 @@ const MapScene = {
   },
   click(hit) {
     const info = this.hitInfo(hit);
+    // herramienta de carreteras: cada casilla que se toca añade un tramo
+    if (this.roadTool) { if (info && info.land) this.roadTool(info.hex); return; }
     if (this.lod === 'hex') { if (info) this.selectHex(info); else { this.selectHex(null); this.onSelect && this.onSelect(null); } return; }
     if (!info) { this.select(null); return; }
     if (this.lod === 'paises') {

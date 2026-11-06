@@ -35,7 +35,8 @@ function render() {
   const key = V.phase + '|' + V.turn;
   if (key !== lastPhaseKey) {
     // al cambiar de fase, limpiamos estados locales que ya no aplican
-    if (lastPhaseKey) { UI.viewOverride = null; UI.resultIdx = 0; if (V.phase !== 'actions') UI.side = null; }
+    if (lastPhaseKey && V.phase !== 'election') { try { MapScene.setNight(null); } catch (e) { } }
+    if (lastPhaseKey) { UI.viewOverride = null; UI.resultIdx = 0; if (V.phase !== 'actions') UI.side = null; if (UI.road) { UI.road = null; MapScene.roadTool = null; MapScene.setRoadPreview(null, null); } }
     if (V.phase === 'news') UI.paperOutlet = Math.floor(Math.random() * 3);
     lastPhaseKey = key;
   }
@@ -120,6 +121,43 @@ function syncScene() {
     Object.entries(LODS).forEach(([k, l]) => lb.appendChild(h('button', { type: 'button', class: 'lod-btn' + (MapScene.lod === k ? ' on' : ''), 'data-lod': k, title: 'Vista de ' + l.name.toLowerCase() + ' (también puedes acercar o alejar la cámara)', onclick: () => MapScene.goLod(k) }, icon(l.icon, { size: 15 }), h('span', null, l.name))));
   } else { tb.style.display = 'none'; document.getElementById('map-lod').style.display = 'none'; }
 }
+
+// ---------- avisos del chat ----------
+const BASE_TITLE = document.title;
+let chatPing = null;
+function chatBeep() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    chatPing = chatPing || new AC();
+    if (chatPing.state === 'suspended') chatPing.resume();
+    const t = chatPing.currentTime, o = chatPing.createOscillator(), g = chatPing.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(880, t); o.frequency.setValueAtTime(1175, t + 0.12);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.12, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+    o.connect(g); g.connect(chatPing.destination); o.start(t); o.stop(t + 0.36);
+  } catch (e) { }
+}
+// Mensajes nuevos dirigidos a mí (a todos o privados): aviso emergente, sonido y título de la pestaña
+function notifyChat() {
+  if (!V || !V.chat) return;
+  const last = V.chat.length ? V.chat[V.chat.length - 1].id : 0;
+  if (UI.chatNotified == null) { UI.chatNotified = last; return; }
+  const fresh = V.chat.filter(m => m.id > UI.chatNotified && m.from !== V.me && (!m.to || m.to === V.me));
+  UI.chatNotified = Math.max(UI.chatNotified, last);
+  if (!fresh.length) return;
+  const m = fresh[fresh.length - 1], p = P(m.from) || {};
+  const watching = UI.chatOpen && !document.hidden;
+  if (!watching) {
+    const t = h('div', { class: 'toast glass chat-toast', onclick: () => { UI.chatOpen = true; renderChat(); render(); t.remove(); } },
+      icon('message-square-quote', { size: 16 }), h('div', null, h('b', { style: { color: p.color || 'inherit' } }, (p.short || p.player || '?') + (m.to ? ' (privado)' : '') + ': '), m.text.length > 90 ? m.text.slice(0, 90) + '…' : m.text));
+    let wrap = document.querySelector('.toast-wrap');
+    if (!wrap) { wrap = h('div', { class: 'toast-wrap' }); document.body.appendChild(wrap); }
+    wrap.appendChild(t); setTimeout(() => t.remove(), 7000);
+  }
+  chatBeep();
+  if (document.hidden) { UI.titleUnread = (UI.titleUnread || 0) + fresh.length; document.title = `(${UI.titleUnread}) Mensaje nuevo · ${BASE_TITLE}`; }
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { UI.titleUnread = 0; document.title = BASE_TITLE; } });
+window.addEventListener('focus', () => { UI.titleUnread = 0; document.title = BASE_TITLE; });
 
 // ---------- chat ----------
 function renderChat() {
@@ -313,6 +351,9 @@ function lobbyScreen() {
       h('div', { class: 'row' }, h('span', { class: 'lbl' }, 'Duración máxima'), seg([4, 6, 8], cfg.years, v => cfg.years = v, v => v + ' años')),
       h('div', { class: 'row' }, h('span', { class: 'lbl' }, 'Cantones'), seg([0, 3, 4, 5, 6], cfg.nCantons, v => cfg.nCantons = v, v => v ? String(v) : 'Al azar')),
       h('div', { class: 'row' }, h('span', { class: 'lbl' }, 'Países'), seg([0, 4, 5, 6, 7], cfg.nCountries, v => cfg.nCountries = v, v => v ? String(v) : 'Al azar')),
+      h('div', { class: 'row' }, h('span', { class: 'lbl' }, 'Elecciones cantonales'), seg([true, false], cfg.stagger !== false, v => cfg.stagger = v, v => v ? 'Desfasadas de las generales' : 'A la vez que las generales')),
+      h('div', { class: 'row' }, h('span', { class: 'lbl' }, 'Leyes de partida'), seg(CHAOS_LEVELS.map(l => l.id), cfg.chaos || 0, v => cfg.chaos = v, v => CHAOS_LEVELS[v].name)),
+      h('p', { class: 'muted small' }, (CHAOS_LEVELS[cfg.chaos || 0] || CHAOS_LEVELS[0]).desc, ' Afecta a la ley electoral: duración de la legislatura (3 años), voto voluntario, umbral del 3 % y voto a los 18.'),
       isHost ? h('div', { class: 'row' }, h('span', { class: 'lbl' }, 'Semilla'), h('input', { type: 'text', id: 'seed', value: cfg.seed || '', placeholder: 'Opcional', style: { width: '10em' }, oninput: e => { cfg.seed = e.target.value; } })) : null),
     isHost ? h('div', { class: 'btn-row' }, btn(n < minPlayers ? `Faltan jugadores (mínimo ${minPlayers})` : 'Empezar la partida', () => { Host.startGame(); }, { kind: 'primary', icon: 'play', disabled: n < minPlayers })) : null));
 }
@@ -327,10 +368,11 @@ window.addEventListener('DOMContentLoaded', () => {
   MapScene.onHover = mapTooltip;
   MapScene.onLod = lod => { document.querySelectorAll('#map-lod .lod-btn').forEach(b => b.classList.toggle('on', b.dataset.lod === lod)); mapTooltip(null); };
   Client.on(kind => {
-    if (kind === 'view') { V = Client.view; render(); }
+    if (kind === 'view') { V = Client.view; notifyChat(); if (V.timerLeft != null) { UI.timerEnd = Date.now() + V.timerLeft; if (V.timerLeft > 100000) UI.timerWarned = false; } render(); }
     else if (kind === 'lobby' && !V) render();
     else if (kind === 'static' && V) syncScene();
   });
   render();
+  setInterval(() => { try { tickPhaseTimer(); } catch (e) { } try { tickNight(); } catch (e) { console.error(e); } }, 250);
 });
 window.addEventListener('error', e => { console.error(e.error || e.message); });

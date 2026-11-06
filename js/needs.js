@@ -13,7 +13,7 @@
 'use strict';
 
 // (orden en el que se cubren si no llega el dinero: primero lo básico)
-const NEED_ORDER = ['salud', 'comida', 'calor', 'ropaS', 'enseres', 'ropa', 'lujo', 'hogar', 'ocio'];
+const NEED_ORDER = ['salud', 'comida', 'calor', 'ropaS', 'enseres', 'ropa', 'lujo', 'hogar', 'transporte', 'ocio'];
 // Lo que necesita de salud cada persona según su edad (los niños, la mitad)
 const healthAgeF = age => age < 30 ? 0.6 : age < 60 ? 1 : age < 75 ? 1.6 : 2.2;
 const NEEDS_BY_ID = Object.fromEntries(NEEDS.map(n => [n.id, n]));
@@ -53,7 +53,9 @@ function needCosts(G, smooth) {
     for (const n of NEEDS) {
       if (n.service) { out[n.id] = { sh: {}, unit: 0 }; continue; }
       // la gente cambia sus costumbres poco a poco: el reparto se mueve hacia el nuevo cada turno
-      let sh = needShares(n, g => localPrice(G, i, g), p.armasCiviles);
+      // (el tren solo lo puede coger quien vive en una ciudad con tren)
+      const caps = n.id === 'transporte' ? { viajes: n.max.viajes * railAccess(G, i) } : null;
+      let sh = needShares(n, g => localPrice(G, i, g), p.armasCiviles, caps);
       const old = c.needSh[n.id];
       if (old && smooth) { const m = {}; for (const g in sh) m[g] = lerp(old[g] ?? sh[g], sh[g], 0.3); const t = sum(Object.values(m)) || 1; for (const g in m) m[g] /= t; sh = m; }
       if (smooth) c.needSh[n.id] = sh;

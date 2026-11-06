@@ -108,7 +108,7 @@ const Host = {
   active: false, code: null, mode: 'online', lobby: null, conns: {}, connPid: {}, transport: null, timer: null, myPid: null,
   start(mode, code, hostName, onReady, onError) {
     this.active = true; this.mode = mode; this.code = code;
-    this.lobby = { code, started: false, config: { years: 6, nCantons: 0, nCountries: 0, seed: '' }, players: [{ name: hostName, token: myToken(), online: true, host: true }] };
+    this.lobby = { code, started: false, config: { years: 6, nCantons: 0, nCountries: 0, seed: '', stagger: true, chaos: 0 }, players: [{ name: hostName, token: myToken(), online: true, host: true }] };
     this.transport = Transports[mode].host(code, {
       open: () => onReady && onReady(),
       error: msg => onError && onError(msg),
@@ -122,6 +122,8 @@ const Host = {
     G = g; RNG.state = g.rngState || 1;
     G.players.forEach((p, i) => p.online = i === 0);
     G.players[0].token = myToken();
+    if (G.phase === 'actions') G.timer = { end: Date.now() + ACTION_SECONDS * 1000 };
+    this.startTimer();
     this.active = true; this.mode = mode; this.code = g.code;
     this.lobby = { code: g.code, started: true, config: {}, players: [] };
     this.myPid = G.players[0].id;
@@ -215,8 +217,9 @@ const Host = {
   startGame() {
     const players = this.lobby.players.map(p => ({ name: p.name, token: p.token }));
     const cfg = this.lobby.config;
-    hostNewGame({ code: this.code, years: cfg.years, nCantons: cfg.nCantons || null, nCountries: cfg.nCountries || null, seed: parseInt(cfg.seed, 10) || null }, players);
+    hostNewGame({ code: this.code, years: cfg.years, nCantons: cfg.nCantons || null, nCountries: cfg.nCountries || null, seed: parseInt(cfg.seed, 10) || null, stagger: cfg.stagger !== false, chaos: cfg.chaos || 0 }, players);
     this.lobby.started = true;
+    this.startTimer();
     this.myPid = G.players[0].id;
     // vincular conexiones con partidos
     for (const cid in this.connPid) {
@@ -226,6 +229,10 @@ const Host = {
     }
     G.players.forEach(p => p.online = p.idx === 0 || Object.values(this.connPid).includes(p.id));
     this.scheduleBroadcast();
+  },
+  startTimer() {
+    if (this.tickId) return;
+    this.tickId = setInterval(() => { try { if (this.lobby && this.lobby.started && timerTick()) this.broadcast(); } catch (e) { console.error(e); } }, 1000);
   },
   scheduleBroadcast() {
     if (this.timer) return;

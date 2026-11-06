@@ -66,7 +66,7 @@ En la portada, elige **«Pestañas de este navegador»**: puedes abrir varias pe
 
   El debate tiene un bloque nuevo de autoridad y libertades; la ciudadanía tiene su propia posición en ese eje (militares y policías hacia el orden, artistas y estudiantes hacia las libertades), y leyes como el código penal, la independencia judicial, la televisión pública o el gasto en seguridad mueven a los partidos en él.
 - **Partidos regionalistas.** Con al menos 3 partidos, durante el debate inicial cualquiera puede declararse regionalista de un cantón con más del 40 % de identidad propia (panel «Ámbito de tu candidatura»). Solo se presenta en ese cantón, tanto en las generales como en las cantonales, y allí recibe el voto identitario. Puede haber varios, del mismo cantón o de cantones distintos, siempre que queden al menos 2 partidos de ámbito nacional. Al cerrarse el debate su ideología territorial se inclina hacia el autogobierno y sus misiones de escala nacional (gran grupo, primera fuerza, gobernar media docena de cantones) se cambian por otras propias: gobernar su cantón, mayoría absoluta en casa, partido bisagra o más autogobierno. Se reconocen por un alfiler junto a su nombre.
-- **Logotipos nuevos.** Tres estilos (lleno, invertido y partido en dos), 12 formas (círculo, cuadrado redondeado, cuadrado, escudo, hexágono, octógono, rombo, banderín, arco, anillo, sol y corona de laurel) y 76 símbolos: 29 dibujados a propósito (rosa, puño, paloma, antorcha, laurel, olivo, espigas, sol naciente, estrellas, corona de estrellas, hemiciclo, columna, cruz, flecha, llama, corazón, anillos, árbol, montañas, girasol, flor, trisquel, faro, puente, franjas, aves en vuelo…), la opción de usar las **siglas** del partido como logotipo y 47 iconos escogidos por su sentido político. Fuera cerebros, tiendas de campaña y similares.
+- **Logotipos nuevos.** Tres estilos (lleno, invertido y partido en dos), 12 formas (círculo, cuadrado redondeado, cuadrado, escudo, hexágono, octógono, rombo, banderín, arco, anillo, sol y corona de laurel) y 76 símbolos: 29 dibujados a propósito (rosa, puño, paloma, antorcha, laurel, olivo, espigas, sol naciente, estrellas, corona de estrellas, hemiciclo, columna, cruz, flecha, llama, corazón, anillos, árbol, montañas, girasol, flor, trisquel, faro, puente, franjas, aves en vuelo…), la opción de usar las **siglas** del partido como logotipo y 47 iconos escogidos por su sentido político. Además, el selector incluye un buscador con **todo el catálogo de Lucide** (2.292 iconos, con el nombre en inglés, p. ej. «train», «flag» o «bluetooth»), así que cada partido puede usar cualquiera de ellos.
 
 ## Interfaz 2.4
 
@@ -355,6 +355,27 @@ En la portada, elige **«Pestañas de este navegador»**: puedes abrir varias pe
 
 **Corrupción**: «Las cloacas» permiten financiación irregular, comisiones, clientelismo, espionaje o pagar abogados. Cada acción deja pruebas; cada trimestre hay un riesgo de que estallen según las pruebas acumuladas, la independencia judicial, la fiscalía y la transparencia (que también son leyes). Un escándalo trae multa, caída en las encuestas, imputados y titulares.
 
+## Transporte: carreteras, vías de tren, coches y trenes
+
+- **Quién construye.** Carreteras y vías de tren las pone quien tenga la competencia de transporte: el Ministerio de Transporte en todo el país (si la competencia es nacional o compartida) y cada gobierno cantonal en su cantón (si es cantonal o compartida). En *Acciones → Carreteras y trenes* se elige «Trazar una carretera» o «Tender una vía de tren», se pulsa «Abrir el mapa» y se van tocando casillas: cada toque añade un tramo por el camino más barato (aprovechando lo que ya hay de esa red). Nunca por montañas ni por el mar; colinas, bosques, ríos (puentes) y rocas encarecen la obra (al tren, las colinas mucho más). Cada obra cuesta 1 PC y lo que valgan sus casillas: unos 40.000 € por casilla de carretera en llano y unos 100.000 € por casilla de vía (en el presupuesto, «Construcción de carreteras» y «Construcción de vías de tren»).
+- **Para qué sirven.** Si una carretera o una vía une las capitales de dos cantones (o de dos países), el transporte de mercancías entre ellos se abarata: cuenta cada casilla de la red en lugar de cada cantón cruzado (cruzar a un cantón vecino cuesta 1; cada casilla de carretera, 0,08; cada casilla de vía, 0,025). Las ciudades y los pueblos son estaciones de la red, pero de uno a otro solo se pasa por la carretera o la vía. Los pueblos unidos por carretera con su capital suben la calidad del transporte del cantón (hasta 12 puntos), y el buen tren, hasta 8 más.
+- **Los trenes necesitan vías.** Una compañía ferroviaria solo vende viajes de verdad si su ciudad está unida por tren con otras: sin vías, una cuarta parte (algún cercanías); unida con otra ciudad, el 85 %; con dos o más, todo (los pueblos cuentan un tercio). Y solo puede coger el tren la gente cuya ciudad tiene tren; el resto, si lo necesita, va en coche. Cada país empieza con algunas líneas desde su capital hacia las ciudades más cercanas.
+- **Vías privadas.** La *Ley del Sector Público* tiene un campo nuevo, «Vías de tren privadas». Si se permite, una compañía ferroviaria privada mal conectada puede tender ella misma la vía hasta la ciudad más cercana de su país: pone parte con su caja y el resto con un préstamo, y solo lo hace si los viajes de más pagan la obra en unos veinte años. Es caro, así que solo lo hacen las grandes.
+- **Vecinos.** Los gobiernos extranjeros hacen carreteras y vías según quién gobierna: los partidos productivistas hacen más carreteras y los ecologistas prefieren el tren. Si las cuentas no le cuadran a un partido responsable con el gasto, no hay obras. Primero unen sus ciudades a la red de su capital; después llevan una sola línea de cada red hasta la frontera con cada vecino. Cada país tiene además un tope de casillas de carretera y de vía según su tamaño. Solo construyen en su territorio: para conectar con ellos hay que poner nuestra parte.
+- **En el mapa**, las carreteras son cintas grises y las vías, balasto con traviesas y dos raíles. El trazado provisional sale en naranja (carretera) o en morado (vía).
+- **Automóviles y trenes.** La *fábrica de automóviles* hace coches con metal y máquinas; la *compañía ferroviaria* vende viajes en tren con electricidad y máquinas (no cruzan el mar). Las dos pueden ser públicas.
+- **Necesidad de transporte.** Los hogares pobres no la tienen; a partir de «tirando» aparece y crece con la riqueza. Se cubre con coches o con viajes en tren (el tren, como mucho el 70 %, y solo donde hay tren).
+- **Partidas guardadas antes.** Siguen funcionando. Al cargarlas, cada país recibe su red de tren de partida, y se quitan las carreteras que habían hecho los países extranjeros (las telarañas de antes); a partir de ahí las vuelven a construir con las reglas nuevas. Las nuestras se quedan.
+
+## Salario mínimo continuo y caos inicial de la legislación
+
+- **Salario mínimo.** Ya no es una lista de cinco valores: en la Reforma Laboral se elige con una barra (o escribiendo la cifra) entre 0 y el 65 % del salario medio, con hasta dos decimales, igual que los impuestos. El 0 es «sin salario mínimo». El decreto del Ministerio de Economía mueve el salario de cinco en cinco puntos (desde 0 salta al 35 %).
+- **Leyes de partida.** En la sala de espera, «Leyes de partida» elige lo estándar o caótico que será el comienzo: *Estándar*, *Algo raro* (20 %), *Caótico* (50 %) o *Disparatado* (85 %). Es la probabilidad, por ley, de que se salga de su valor estándar. Por ahora solo afecta a la ley electoral: duración de la legislatura (estándar 3 años; puede salir 2, 4 o 5), voto obligatorio (estándar: voluntario), umbral electoral (estándar 3 %; puede salir sin umbral, 5 % o 10 %) y edad de voto (estándar 18; puede salir 16). Solo cuenta para nuestro país; el resto de leyes y los demás países se generan como siempre. Con «Estándar» la partida sale igual que antes con la misma semilla.
+
+## Noche electoral
+
+Las elecciones (generales y cantonales) ya no dan el resultado de golpe: el escrutinio llega localidad a localidad, primero los pueblos pequeños y al final las ciudades. El mapa se va pintando con el partido que gana en cada sitio y el panel muestra lo escrutado, la participación, los porcentajes, la proyección de escaños (o de cada parlamento cantonal) y los últimos datos. Dura unos 40 segundos; «Ver el resultado final» lo salta.
+
 ## Estructura de ficheros
 
 ```
@@ -363,7 +384,7 @@ css/style.css       estilo de la interfaz
 lib/three.bundle.js motor 3D (three.js r169)
 lib/peerjs.min.js   conexión entre navegadores (PeerJS 1.5.4)
 js/util.js          utilidades (aleatoriedad con semilla, formatos, D'Hondt…)
-js/icons*.js        iconos (Lucide, licencia ISC) y logos de partido
+js/icons*.js        iconos (Lucide, licencia ISC: `icons-data.js` el subconjunto de la interfaz, `icons-lucide.js` el catálogo completo) y logos de partido
 js/data.js          contenido: debate, leyes, ministerios, misiones, eventos
 js/faces.js         generador de retratos
 js/world.js         generación del mundo, países, cantones y ciudadanía
@@ -372,6 +393,7 @@ js/firms.js         empresas, centros públicos y mercados de bienes
 js/labor.js         mercado de trabajo (ofertas, búsqueda, sueldos, despidos, mudanzas), cualificaciones, estudios y socios
 js/finance.js       ahorro, bancos, préstamos, vivienda y construcción
 js/markets.js       mercado mundial por cantones, transporte, aranceles y tratados
+js/roads.js         carreteras y vías de tren: trazado, coste, efecto en el transporte y en los trenes, red de partida, vías privadas y obras de los países vecinos
 js/needs.js         necesidades y nivel de vida de los hogares
 js/regions.js       culturas, fervor identitario, regionalistas, nombres y fusiones de cantones
 js/foreign.js       países extranjeros: su simulación, partidos, leyes, elecciones, tratados y migración

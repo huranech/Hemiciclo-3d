@@ -153,6 +153,8 @@ function makeNationState(G, f) {
 function buildForeignStates(G) {
   G.foreign.forEach(f => makeNationState(G, f));
   linkStates(G);
+  // la red ferroviaria de partida de cada país (antes de repartir las empresas: los trenes necesitan vías)
+  initialRails(G);
   // tratados de libre comercio entre países (siempre de los dos lados)
   const W = worldStates(G);
   for (let a = 0; a < W.length; a++) for (let b = a + 1; b < W.length; b++) {
@@ -517,6 +519,7 @@ function foreignPoliticsQuarter(G) {
     if (e.unemployment > 0.15 && !(f.crisisU > 0)) { f.crisisU = 6; pushWorldNews(G, { type: 'bad', importance: 3, text: `El paro se dispara en ${f.name}: ya afecta al ${fmt.pct(e.unemployment, 0)} de su población activa.` }); }
     if (f.crisis > 0) f.crisis--; if (f.crisisU > 0) f.crisisU--;
   });
+  foreignInfraQuarter(G);
   refreshNations(G);
   // a nuestra prensa llegan las noticias internacionales más importantes del trimestre
   const wn = (G.eco.worldNews || []).sort((a, b) => b.importance - a.importance).slice(0, 4);

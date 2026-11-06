@@ -448,19 +448,26 @@ function initialPolicies(G) {
     lenguas: G.cantons.some(c => c.cul > 0 && c.fv.can > 0.5) ? RNG.chance(0.6) : false,
     concierto: [], cupo: 1, curriculo: RNG.pick(['comun', 'mixto', 'mixto']), simbolos: RNG.pick(['nacional', 'ambas', 'ambas']), derechoDecidir: 'prohibida', selecciones: false,
     energia: RNG.pick(['fosil', 'mixto', 'mixto', 'nuclear', 'renovable']),
-    proteccionNatural: 1,
+    proteccionNatural: 1, viasPrivadas: RNG.chance(0.4),
     comp: {
       sanidad: RNG.weighted(['nacional', 'compartida', 'cantonal'], v => ({ nacional: 4, compartida: 2, cantonal: 3 })[v]),
       educacion: RNG.weighted(['nacional', 'compartida', 'cantonal'], v => ({ nacional: 4, compartida: 2, cantonal: 3 })[v]),
       transporte: RNG.weighted(['nacional', 'compartida', 'cantonal'], v => ({ nacional: 2, compartida: 5, cantonal: 1 })[v]),
       seguridad: RNG.weighted(['nacional', 'compartida', 'cantonal'], v => ({ nacional: 6, compartida: 2, cantonal: 1 })[v]),
       social: RNG.weighted(['nacional', 'compartida', 'cantonal'], v => ({ nacional: 2, compartida: 3, cantonal: 3 })[v]) },
-    solidaridad: 1, sistemaElectoral: 'dhondt_canton', umbral: 0.03, legislatura: 4, financiacion: 'mixta',
+    solidaridad: 1, sistemaElectoral: 'dhondt_canton', umbral: 0.03, legislatura: 3, financiacion: 'mixta',
     transparencia: RNG.chance(0.5), fiscalia: false, judicial: RNG.pick([1, 2]), tvPublica: 'independiente',
     limiteMandatos: false, votoObligatorio: false, edadVoto: 18, votoResidentes: false, naturalizacion: 10,
     tratados: {}, arImp: {}, arExp: {}, ayudaInversion: RNG.pick([0, 0, 0.15]), armasCiviles: RNG.pick([0, 0, 1]),
   };
   G.foreign.forEach(f => pol.tratados[f.id] = RNG.chance(0.4));
+  // caos inicial (solo nuestro país): cada ley de la lista puede salirse de su valor estándar
+  const chaosP = CHAOS_LEVELS[G.chaos || 0] ? CHAOS_LEVELS[G.chaos || 0].p : 0;
+  if (chaosP > 0) for (const id in CHAOS_STD) {
+    if (!RNG.chance(chaosP)) continue;
+    const f = FIELDS[id], std = CHAOS_STD[id];
+    pol[f.path] = RNG.pick(f.options.filter(o => o !== std));
+  }
   // partidas por materia según quién tenga la competencia
   AREAS.forEach(a => {
     const lvl = Math.round(a.base * RNG.range(0.85, 1.15) * 100) / 100;

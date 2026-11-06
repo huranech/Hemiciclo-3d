@@ -6,7 +6,7 @@
 'use strict';
 
 const RETURNS = 1;                 // producción proporcional a la plantilla (cada trabajador produce lo mismo)
-const MANUF = ['muebles', 'textil', 'maquinaria', 'armamento'];
+const MANUF = ['muebles', 'textil', 'maquinaria', 'armamento', 'automovilistica'];
 // Centrales eléctricas: cuánto carbón y cuántas máquinas gastan según el modelo energético
 const ENERGY_MIX = { fosil: { carbon: 1.25, maquinas: 0.8, em: 2.5 }, mixto: { carbon: 1, maquinas: 1, em: 1.6 }, renovable: { carbon: 0.35, maquinas: 2, em: 0.3 }, nuclear: { carbon: 0.2, maquinas: 1.6, em: 0.2 } };
 // Mezcla con la que se produce de verdad: las centrales cambian poco a poco hacia la que manda la ley
@@ -96,11 +96,13 @@ function slotRule(kind, h, ci) {
     case 'gimnasio': return city ? 2 : hasF(h, 'pueblo') ? 1 : 0;
     case 'alimentacion': return hasF(h, 'fabrica') ? 3 : city ? 2 : hasF(h, 'pueblo') ? 1 : hasF(h, 'puerto') ? 1 : 0;
     case 'comercio': return city ? 5 : hasF(h, 'pueblo') ? 2 : 0;
+    case 'automovilistica': return hasF(h, 'fabrica') ? 4 : city ? 3 : 0;
+    case 'ferroviaria': return city ? 3 : hasF(h, 'pueblo') ? 1 : 0;
   }
   return 0;
 }
 // Grupos que comparten sitio en una casilla
-const SLOT_GROUP = { muebles: 'manuf', textil: 'manuf', maquinaria: 'manuf', armamento: 'manuf' };
+const SLOT_GROUP = { muebles: 'manuf', textil: 'manuf', maquinaria: 'manuf', armamento: 'manuf', automovilistica: 'manuf' };
 // Casillas del cantón donde cabe una empresa de ese tipo (por su regla y por las parcelas libres)
 function freeSlots(G, kind, canton, lots) {
   const used = {};
@@ -112,6 +114,7 @@ function freeSlots(G, kind, canton, lots) {
 // Lo que la ley de protección natural le quita a pesca, bosques, canteras y minas
 function policyFactor(G, f) {
   const prot = (G.pol.proteccionNatural ?? 1) - 1;
+  if (f.kind === 'ferroviaria') return f.c != null ? railFactorOf(G, f.c) : 1;   // los trenes necesitan vías
   return { pesca: 1 - prot * 0.12, silvicultura: 1 - prot * 0.15, cantera: 1 - prot * 0.1, minaMetal: 1 - prot * 0.08, minaCarbon: 1 - prot * 0.08 }[f.kind] || 1;
 }
 // Calidad del sitio: solo sirve a quien funda una empresa para elegir dónde ponerla
@@ -432,12 +435,16 @@ function goodsPlan(G, byC, lfC) {
     for (const g in PUBLIC_BASKET[area]) if (g !== 'armas') pub[g] += money * PUBLIC_BASKET[area][g] / GOODS[g].price;
   }
   pub.armas += agents * ARMS_PER_AGENT;
+  // parte de la gente que puede coger el tren (su ciudad unida con otras)
+  const railCov = sum(G.cantons.map((c, i) => (c.pop || 0) * railAccess(G, i))) / Math.max(1, pop);
   // trabajadores de cada tipo para un nivel de vida (fraccionario) de toda la población
   const plan = wl => {
     // (los hogares no están todos en el nivel medio: se reparten alrededor, y los de arriba piden otras cosas)
     const wts = range(10).map(l => Math.exp(-Math.pow(l + 1 - wl, 2) / (2 * 1.4 * 1.4))), wt = sum(wts);
     const per = range(10).map(l => wts[l] > 0.01 ? needsPerCapita(l + 1, p.armasCiviles) : null);
     const want = {}; GOOD_IDS.forEach(g => want[g] = sum(range(10), l => per[l] ? per[l][g] * wts[l] / wt : 0) * pop + pub[g]);
+    // donde no hay tren, la gente se mueve en coche: los viajes que no se pueden dar pasan a ser coches
+    if (want.viajes > 0) { const sh = want.viajes * (1 - railCov); want.viajes -= sh; want.coches += sh * TRANSPORT_NEED.goods.viajes / TRANSPORT_NEED.goods.coches; }
     // obras: madera y piedra de las constructoras
     const cw = sum(G.firms.filter(f => f.kind === 'constructora'), f => Math.max(0, (f.staffN || G.citizens.filter(z => z.firm === f.id).length) - 1));
     want.madera += cw * HOUSING.maderaPerWork; want.piedra += cw * HOUSING.piedraPerWork;
@@ -447,7 +454,7 @@ function goodsPlan(G, byC, lfC) {
       wk = {};
       // las materias primas que piden las fábricas
       const add = (k, w) => { wk[k] = (wk[k] || 0) + w; const K = FIRM_KINDS[k]; const ki = k === 'electrica' ? null : inpOf(G, k); for (const g in (K.inp || K.inpAny || {})) tot[g] += (ki ? ki[g] : K.inp[g] * (mix[g] || 1)) * w; for (const g in (K.boost || {})) if (K.out) tot[g] += K.boost[g] * w; };
-      const order = ['comercio', 'medios', 'gimnasio', 'telecom', 'alimentacion', 'textil', 'muebles', 'maquinaria', 'armamento', 'electrica', 'ganaderia', 'pesca', 'agricultura', 'silvicultura', 'cantera', 'minaMetal', 'minaCarbon'];
+      const order = ['comercio', 'medios', 'gimnasio', 'ferroviaria', 'telecom', 'alimentacion', 'textil', 'muebles', 'automovilistica', 'maquinaria', 'armamento', 'electrica', 'ganaderia', 'pesca', 'agricultura', 'silvicultura', 'cantera', 'minaMetal', 'minaCarbon'];
       for (const k of order) {
         const K = FIRM_KINDS[k];
         if (k === 'agricultura') {
@@ -476,8 +483,10 @@ function goodsPlan(G, byC, lfC) {
   // sitio para cada tipo de empresa en cada cantón (lo no comerciable por mar, cerca de quien lo usa)
   const seed = G.cantons.map((c, i) => Object.fromEntries(KINDS.map(k => {
     const room = sum(G.map.hexes.filter(h => h.c === (G.ci || 0) && h.k === i), h => slotRule(k, h, G.ci || 0));
-    const local = ['electrica', 'telecom', 'medios', 'gimnasio', 'comercio'].includes(k) ? (c.pop || 1) / pop * nC : 1;
-    return [k, room * local + 1e-6];
+    const local = ['electrica', 'telecom', 'medios', 'gimnasio', 'comercio', 'ferroviaria'].includes(k) ? (c.pop || 1) / pop * nC : 1;
+    // (las compañías ferroviarias, donde hay tren)
+    const rail = k === 'ferroviaria' ? (railFactorOf(G, i) >= 0.5 ? railFactorOf(G, i) : 0.02) : 1;
+    return [k, room * local * rail + 1e-6];
   })));
   return { wk, seed, jobs, J, KINDS, byC, lfC };
 }
@@ -854,7 +863,7 @@ function produceSettle(G, opts = {}) {
   // bases de los impuestos que pagan de verdad las empresas este turno (k€), por cantón: nóminas y beneficios
   const tx = { nom: G.cantons.map(() => 0), soc: G.cantons.map(() => 0), carbono: 0 };
   const INTENSITY = { agricultura: 0.8, ganaderia: 2.6, pesca: 0.5, silvicultura: 0.2, muebles: 0.9, textil: 1.3, sanidad: 0.15, educacion: 0.1, constructora: 0.7, banco: 0.05,
-    cantera: 0.8, minaMetal: 1.2, minaCarbon: 1.5, maquinaria: 1, armamento: 0.9, electrica: mix.em, telecom: 0.1, medios: 0.05, alimentacion: 0.5, comercio: 0.1 };
+    cantera: 0.8, minaMetal: 1.2, minaCarbon: 1.5, maquinaria: 1, armamento: 0.9, electrica: mix.em, telecom: 0.1, medios: 0.05, alimentacion: 0.5, comercio: 0.1, automovilistica: 1.1, ferroviaria: 0.2 };
   const svcFees = G.cantons.map(() => 0);
   for (const f of G.firms) {
     const list = staff.get(f.id) || [], ws = workersOf(f, list);
@@ -1174,6 +1183,7 @@ function worksQuarter(G) {
   const e = G.eco;
   foreignWorks(G);
   const fin = finishWorks(G);
+  railFirmsQuarter(G);
   e.builtQ = fin.homes;
   if (fin.homes >= 6) e.news.push({ type: 'good', topic: 'vivienda', importance: 3, text: `Se terminan ${fin.homes} viviendas nuevas este trimestre.` });
   e.upgradesQ = (fin.upgraded || []).length;
@@ -1345,6 +1355,7 @@ function expectedVaw(G, kind, canton, f) {
     let boost = 1, boostCost = 0;
     for (const b in (K.boost || {})) { boost *= 1 + BOOST_GAIN[b]; boostCost += K.boost[b] * k * localPrice(G, canton, b); }
     for (const g in rates) rev += rates[g] * k * boost * sellAt(g);
+    if (kind === 'ferroviaria') rev *= railFactorOf(G, canton);   // (sin vías apenas hay viajes que vender)
     const ki = inpOf(G, kind); for (const g in ki) inp += ki[g] * k * localPrice(G, canton, g);
     inp += boostCost;
   }

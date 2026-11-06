@@ -87,6 +87,8 @@ const SECTORS = [
   { id: 'deporte', name: 'Gimnasios', color: '#e86a8f', goods: true },
   { id: 'alimentacion', name: 'Industria alimentaria', color: '#d9a441', goods: true },
   { id: 'comercio', name: 'Pequeño comercio', color: '#6fb27a', goods: true },
+  { id: 'automocion', name: 'Automoción', color: '#d06a4a', goods: true },
+  { id: 'ferrocarril', name: 'Ferrocarril', color: '#5a7bd0', goods: true },
   { id: 'construccion', name: 'Construcción', color: '#c9a227' },
   { id: 'finanzas', name: 'Banca', color: '#2e8b8b' },
   { id: 'sanidad', noun: 'la sanidad', name: 'Sanidad', color: '#d14b4b', area: 'sanidad' },
@@ -123,10 +125,14 @@ const GOODS = {
   servicios: { name: 'Servicios del comercio', unit: 'u', price: 1.0, bulk: 0.25, overseas: false, icon: 'store' },
   // un servicio: solo se usa donde está el gimnasio (llevarlo a otro cantón casi no compensa)
   gimnasio: { name: 'Gimnasio', unit: 'u', price: 0.5, bulk: 0.3, overseas: false, local: true, icon: 'dumbbell' },
+  // un coche (lo que dura un coche, repartido por trimestres): se fabrica con metal y máquinas y viaja bien
+  coches: { name: 'Automóviles', unit: 'u', price: 6, bulk: 0.03, icon: 'car' },
+  // viajes en tren: un servicio que da la compañía ferroviaria en su red (llega poco más allá y no cruza el mar)
+  viajes: { name: 'Viajes en tren', unit: 'u', price: 0.6, bulk: 0.15, overseas: false, icon: 'train-front' },
 };
 // Orden en que se reparten los mercados de cada turno: primero lo que no necesita insumos y luego lo que
 // se fabrica con ello (así una fábrica sabe cuánta materia prima ha conseguido antes de vender lo que produce)
-const GOOD_CHAIN = ['grano', 'carne', 'pescado', 'alimentos', 'tejido', 'madera', 'piedra', 'metal', 'carbon', 'maquinas', 'gimnasio', 'electricidad', 'telecom', 'entretenimiento', 'armas', 'muebles', 'ropa', 'servicios'];
+const GOOD_CHAIN = ['grano', 'carne', 'pescado', 'alimentos', 'tejido', 'madera', 'piedra', 'metal', 'carbon', 'maquinas', 'gimnasio', 'electricidad', 'telecom', 'entretenimiento', 'armas', 'muebles', 'ropa', 'coches', 'viajes', 'servicios'];
 const GOOD_IDS = Object.keys(GOODS);
 
 // ---------- Empresas ----------
@@ -159,6 +165,12 @@ const FIRM_KINDS = {
   // pequeño comercio: convierte alimentos, ropa o conexión en servicios (tiendas, bares, peluquerías…) que cuentan como ocio
   comercio: { sector: 'comercio', name: 'Pequeño comercio', icon: 'store', cap: 3, maxLvl: 3, capex: 50, out: { servicios: 12 }, inpAny: { alimentos: 2, ropa: 3.33, telecom: 7.27 }, prof: 'comerciante',
     names: ['Comercio', 'Tienda', 'Bazar', 'Mercado', 'Colmado', 'Boutique'] },
+  // automovilística: monta coches con metal y máquinas (con electricidad, más)
+  automovilistica: { sector: 'automocion', name: 'Fábrica de automóviles', icon: 'car', cap: 8, capex: 220, out: { coches: 2 }, inp: { metal: 2.5, maquinas: 0.05 }, profs: [['operario', 0.75], ['ingeniero', 0.25]], boost: { electricidad: 2 },
+    names: ['Motor', 'Automóviles', 'Automoción', 'Carrocerías'] },
+  // ferroviaria: vende viajes en tren; sus trenes gastan electricidad y piezas (máquinas)
+  ferroviaria: { sector: 'ferrocarril', name: 'Compañía ferroviaria', icon: 'train-front', cap: 6, capex: 300, out: { viajes: 18 }, inp: { electricidad: 6, maquinas: 0.05 }, profs: [['operario', 0.7], ['ingeniero', 0.3]],
+    names: ['Ferrocarriles', 'Trenes', 'Líneas Férreas', 'Ferrocarril'] },
   sanidad: { sector: 'sanidad', name: 'Clínica privada', icon: 'stethoscope', cap: 5, capex: 140, prof: 'sanitario', boost: { telecom: 1 }, names: ['Clínica', 'Policlínica', 'Centro médico'] },
   educacion: { sector: 'educacion', name: 'Colegio privado', icon: 'graduation-cap', cap: 4, capex: 110, prof: 'academico', boost: { telecom: 1 }, names: ['Colegio', 'Academia', 'Escuela'] },
   banco: { sector: 'finanzas', name: 'Banco', icon: 'landmark', cap: 8, capex: 100, prof: 'oficinista', boost: { telecom: 1 }, names: ['Banco', 'Caja', 'Caja Rural', 'Banca'] },
@@ -170,7 +182,7 @@ const LEVEL_BONUS = 0.03;
 const levelF = lvl => 1 + LEVEL_BONUS * Math.max(0, (lvl || 1) - 1);
 // Parcelas que ocupa cada edificio en una casilla (cada casilla tiene un límite de parcelas)
 const LOTS = { casa: 1, bloque: 3, agricultura: 2, ganaderia: 2, pesca: 1, silvicultura: 1, muebles: 2, textil: 3, sanidad: 2, educacion: 2, banco: 1, constructora: 1,
-  cantera: 2, minaMetal: 2, minaCarbon: 2, maquinaria: 3, armamento: 3, electrica: 3, telecom: 1, medios: 1, gimnasio: 1, alimentacion: 3, comercio: 1,
+  cantera: 2, minaMetal: 2, minaCarbon: 2, maquinaria: 3, armamento: 3, electrica: 3, telecom: 1, medios: 1, gimnasio: 1, alimentacion: 3, comercio: 1, automovilistica: 3, ferroviaria: 2,
   centroSalud: 1, hospital: 4, colegio: 2, universidad: 4, comisaria: 1, cuartel: 4 };
 // Mejoras: una empresa que compra esta cantidad (por trabajador y turno) produce un tanto más
 const BOOST_GAIN = { electricidad: 0.2, telecom: 0.15 };
@@ -226,11 +238,15 @@ const NEEDS = [
   { id: 'hogar', name: 'Artículos del hogar', icon: 'hourglass', goods: { muebles: 1 }, share: [0, 0, 0.02, 0.04, 0.06, 0.07, 0.08, 0.09, 0.1, 0.1] },
   { id: 'calor', name: 'Calefacción', icon: 'flame', goods: { tejido: 1, madera: 1, carbon: 1.5, electricidad: 1 }, max: { tejido: 0.25, madera: 0.5, carbon: 0.8 },
     share: [0.13, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12] },
+  // transporte (desde tirando, y cuanto más rico, más): coches o viajes en tren (el tren cubre como mucho el 70 %)
+  { id: 'transporte', name: 'Transporte', icon: 'car', goods: { coches: 10, viajes: 1 }, max: { viajes: 0.7 },
+    share: [0, 0, 0, 0.02, 0.04, 0.06, 0.08, 0.1, 0.11, 0.12] },
   { id: 'ocio', name: 'Ocio', icon: 'tv', goods: { telecom: 1, entretenimiento: 1, gimnasio: 1, servicios: 2, armas: 1 }, max: { telecom: 0.3 },
     share: [0, 0, 0, 0, 0.08, 0.12, 0.16, 0.2, 0.22, 0.24] },
   // (la salud no se compra en el mercado: la cubren la sanidad pública y las clínicas privadas)
   { id: 'salud', name: 'Salud', icon: 'stethoscope', goods: {}, service: 'sanidad', q: [0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5] },
 ];
+const TRANSPORT_NEED = NEEDS.find(n => n.id === 'transporte');
 // Lo que cuesta una unidad de cada necesidad a precios de referencia: lo más barato que se puede comprar
 // respetando lo que puede cubrir cada bien (min y max)
 function needUnitCost(n, priceOf) {
@@ -289,7 +305,7 @@ const PROFESSIONS = {
 // Sectores en los que puede haber empresas públicas (las clínicas y colegios públicos son centros; los bancos y las
 // constructoras no se pueden nacionalizar ni crear)
 const PE_KINDS = ['agricultura', 'ganaderia', 'pesca', 'silvicultura', 'cantera', 'minaMetal', 'minaCarbon', 'alimentacion', 'muebles', 'textil',
-  'maquinaria', 'armamento', 'electrica', 'telecom', 'medios', 'gimnasio', 'comercio'];
+  'maquinaria', 'armamento', 'electrica', 'telecom', 'medios', 'gimnasio', 'comercio', 'automovilistica', 'ferroviaria'];
 // Parte del empleo que pueden tener las empresas públicas según la ley del sector público
 const PE_LIMIT = [0, 0.05, 0.15, 0.35, 1];
 // Situación laboral de cada persona (otra forma de clasificarla, además de su profesión) y cómo tira su ideología
@@ -369,7 +385,7 @@ const SECTOR_PROFESSIONS = {
   agricultura: [['agricultor', 1]], ganaderia: [['agricultor', 1]], pesca: [['pescador', 1]], silvicultura: [['operario', 1]],
   muebles: [['operario', 1]], textil: [['operario', 1]], construccion: [['operario', 1]], finanzas: [['oficinista', 1]],
   canteras: [['operario', 1]], mineria: [['operario', 1]], maquinaria: [['operario', 0.7], ['ingeniero', 0.3]], armamento: [['operario', 0.6], ['ingeniero', 0.4]],
-  energia: [['ingeniero', 0.6], ['operario', 0.4]], telecom: [['ingeniero', 1]], medios: [['periodista', 1]], deporte: [['comerciante', 1]], alimentacion: [['operario', 1]], comercio: [['comerciante', 1]], sanidad: [['sanitario', 1]], educacion: [['academico', 1]], seguridad: [['policia', 1]],
+  energia: [['ingeniero', 0.6], ['operario', 0.4]], telecom: [['ingeniero', 1]], medios: [['periodista', 1]], deporte: [['comerciante', 1]], alimentacion: [['operario', 1]], comercio: [['comerciante', 1]], automocion: [['operario', 0.75], ['ingeniero', 0.25]], ferrocarril: [['operario', 0.7], ['ingeniero', 0.3]], sanidad: [['sanitario', 1]], educacion: [['academico', 1]], seguridad: [['policia', 1]],
 };
 const LEVEL_NAMES = ['', 'Precario', 'Bajo', 'Medio', 'Medio-alto', 'Alto'];
 const LEVEL_MULT = [0, 0.55, 0.8, 1.0, 1.45, 2.6];
@@ -801,9 +817,9 @@ const FIELD_LIST = [
   { id: 'limiteMandatos', name: 'Limitación de mandatos', path: 'limiteMandatos', organic: true, options: [false, true],
     label: v => v ? 'Máximo dos investiduras seguidas' : 'Sin límite', pos: v => ({ aut: v ? -0.7 : 0.4 }), desc: 'Un mismo partido no puede ser investido más de dos veces seguidas.' },
   // --- Trabajo y pensiones ---
-  { id: 'salarioMin', name: 'Salario mínimo', path: 'salarioMin', options: [0, 0.35, 0.45, 0.55, 0.65],
-    label: v => v === 0 ? 'Sin salario mínimo' : pctLbl(v) + ' del salario medio', pos: v => ({ eco: v === 0 ? 2 : 1.6 - (v - 0.35) / 0.30 * 3.4 }),
-    desc: 'Eleva las rentas bajas; si es muy alto destruye empleo poco productivo.' },
+  { id: 'salarioMin', name: 'Salario mínimo', path: 'salarioMin', range: [0, 0.65], options: [0, 0.35, 0.45, 0.55, 0.65],
+    label: v => v === 0 ? 'Sin salario mínimo' : pctLbl(v) + ' del salario medio', pos: v => ({ eco: v <= 0 ? 2 : clamp(1.6 - (v - 0.35) / 0.30 * 3.4, -1.8, 2) }),
+    desc: 'Porcentaje del salario medio por debajo del cual no se puede pagar (de 0 a 65 %). Eleva las rentas bajas; si es muy alto destruye empleo poco productivo.' },
   { id: 'laboral', noun: 'la legislación laboral', name: 'Contratación y despido', path: 'laboral', options: [0, 1, 2, 3, 4],
     label: v => ['Muy protectora', 'Protectora', 'Equilibrada', 'Flexible', 'Muy flexible'][v], pos: v => ({ eco: -2 + v }),
     desc: 'La flexibilidad crea empleo pero aumenta la precariedad.' },
@@ -870,6 +886,9 @@ const FIELD_LIST = [
   { id: 'ayudaInversion', name: 'Ayudas a la inversión empresarial', path: 'ayudaInversion', options: [0, 0.15, 0.3],
     label: v => v ? `El Estado paga el ${Math.round(v * 100)} % de la obra` : 'Sin ayudas', pos: v => ({ eco: [0.3, -0.3, -0.7][[0, 0.15, 0.3].indexOf(v)] }),
     desc: 'Parte de la obra que paga el Estado cuando alguien funda una empresa o la amplía un nivel. No obliga a nadie: hace que a más empresarios les salgan las cuentas para invertir.' },
+  { id: 'viasPrivadas', name: 'Vías de tren privadas', path: 'viasPrivadas', options: [false, true],
+    label: v => v ? 'Las compañías ferroviarias pueden tender sus propias vías' : 'Solo las Administraciones construyen vías', pos: v => ({ eco: v ? 0.8 : -0.5 }),
+    desc: 'Si se permite, una compañía ferroviaria privada cuya ciudad no está bien unida por tren puede pagarse ella misma (con su caja y un préstamo) la vía hasta la ciudad más cercana. Le sale caro, así que solo lo hacen las grandes.' },
   // --- Seguridad y justicia ---
   { id: 'penal', name: 'Código penal', path: 'penal', options: [0, 1, 2],
     label: v => ['Garantista', 'Equilibrado', 'Punitivo'][v], pos: v => ({ aut: [-1.5, 0, 1.5][v], soc: [-0.5, 0, 0.5][v] }), desc: 'Endurecer las penas mejora algo la seguridad.' },
@@ -926,6 +945,14 @@ const FIELD_LIST = [
     pos: v => ({ eco: { publica: -0.8, mixta: 0, privada: 1 }[v] }), desc: 'De dónde sacan los partidos su dinero.' },
 ];
 const FIELDS = {}; FIELD_LIST.forEach(f => FIELDS[f.id] = f);
+// Caos inicial de la legislación: valor estándar de cada ley y probabilidad de que se salga de él (por ley)
+const CHAOS_STD = { legislatura: 3, votoObligatorio: false, umbral: 0.03, edadVoto: 18 };
+const CHAOS_LEVELS = [
+  { id: 0, name: 'Estándar', p: 0, desc: 'Todas las leyes de partida son las habituales.' },
+  { id: 1, name: 'Algo raro', p: 0.2, desc: 'Cada ley afectada tiene un 20 % de probabilidad de salirse de lo habitual.' },
+  { id: 2, name: 'Caótico', p: 0.5, desc: 'Cada ley afectada tiene un 50 % de probabilidad de salirse de lo habitual.' },
+  { id: 3, name: 'Disparatado', p: 0.85, desc: 'Casi todas las leyes afectadas arrancan con valores insólitos.' },
+];
 
 
 // ============================================================
@@ -1014,7 +1041,7 @@ AREAS.forEach(a => { const f = compField(a); FIELD_LIST.push(f); FIELDS[f.id] = 
 // Aranceles por producto: excepciones al arancel general (importación) y aranceles a la exportación
 const TARIFF_OPTS = [0, 0.05, 0.10, 0.20, 0.30, 0.50];
 const GOOD_PRODUCERS = { grano: ['agricultor'], tejido: ['agricultor'], carne: ['agricultor'], pescado: ['pescador'], madera: ['operario'], muebles: ['operario'], ropa: ['operario'],
-  piedra: ['operario'], metal: ['operario'], carbon: ['operario'], maquinas: ['operario', 'ingeniero'], armas: ['operario', 'ingeniero'], electricidad: ['ingeniero'], telecom: ['ingeniero'], entretenimiento: ['periodista'], gimnasio: ['comerciante'], alimentos: ['operario'], servicios: ['comerciante'] };
+  piedra: ['operario'], metal: ['operario'], carbon: ['operario'], maquinas: ['operario', 'ingeniero'], armas: ['operario', 'ingeniero'], electricidad: ['ingeniero'], telecom: ['ingeniero'], entretenimiento: ['periodista'], gimnasio: ['comerciante'], alimentos: ['operario'], servicios: ['comerciante'], coches: ['operario', 'ingeniero'], viajes: ['operario'] };
 function tariffField(g, exp) {
   const nm = GOODS[g].name.toLowerCase();
   return { id: (exp ? 'are_' : 'ari_') + g, name: (exp ? 'Arancel a la exportación de ' : 'Arancel a la importación de ') + nm, short: (exp ? 'Exportar ' : 'Importar ') + nm,
@@ -1038,7 +1065,7 @@ const LAW_PACKS = [
     desc: 'Hipotecas, cuánto se puede construir, ayudas para comprar y desahucios.' },
   { id: 'banca', noun: 'la ley de banca', name: 'Ley de Banca', icon: 'landmark', fields: ['solvencia', 'garantiaDepositos', 'bancoCentral'],
     desc: 'Solvencia de los bancos, garantía de los ahorros y banco central.' },
-  { id: 'sectorPublico', noun: 'el sector público', name: 'Ley del Sector Público', icon: 'factory', fields: ['empresasPublicas', 'ayudaInversion'], desc: '' },
+  { id: 'sectorPublico', noun: 'el sector público', name: 'Ley del Sector Público', icon: 'factory', fields: ['empresasPublicas', 'ayudaInversion', 'viasPrivadas'], desc: '' },
   { id: 'comercio', noun: 'la política comercial', name: 'Ley de Comercio Exterior', icon: 'ship', fields: ['aranceles'].concat(TARIFF_FIELD_IDS), addable: true, addLabel: 'Añadir un arancel para un producto concreto:', dynamicTreaties: true, desc: 'Aranceles y tratados de libre comercio.' },
   { id: 'energia', name: 'Ley de Energía y Medio Ambiente', icon: 'zap', noun: 'la ley de energía', fields: ['energia', 'proteccionNatural', 'carbono'], desc: '' },
   { id: 'derechos', noun: 'los derechos civiles', name: 'Ley de Derechos Civiles', icon: 'scale', fields: ['matrimonio', 'aborto', 'eutanasia', 'cannabis'], desc: '' },
@@ -1181,10 +1208,15 @@ const MISSIONS = [
     gen: G => ({ target: Math.round(G.eco.gdp * (1 + 0.022 * gameYears(G) * RNG.range(1.0, 1.4))) }),
     text: p => `Que el PIB del país alcance los ${fmt.bn(p.target)} anuales.`,
     check: (G, P, p) => ({ done: G.eco.gdp >= p.target, progress: `Ahora: ${fmt.bn(G.eco.gdp)}` }) },
-  { id: 'paro', cat: 'economia', title: 'Pleno empleo',
-    gen: G => ({ target: Math.max(0.035, +(G.eco.unemployment * RNG.range(0.55, 0.7)).toFixed(3)) }),
-    text: p => `Que el paro baje del ${fmt.pct(p.target)}.`,
-    check: (G, P, p) => ({ done: G.eco.unemployment < p.target, progress: `Ahora: ${fmt.pct(G.eco.unemployment)}` }) },
+  // (solo sale con un paro alto: con el paro bajo del arranque ya estaría cumplida; hay que mantenerlo varios trimestres)
+  { id: 'paro', cat: 'economia', title: 'Pleno empleo', valid: G => G.eco.unemployment > 0.07,
+    gen: G => ({ target: Math.max(0.04, +(G.eco.unemployment * RNG.range(0.55, 0.65)).toFixed(3)), turns: 4 }),
+    text: p => `Que el paro se mantenga por debajo del ${fmt.pct(p.target)} durante ${p.turns || 1} trimestres seguidos.`,
+    check: (G, P, p) => {
+      const h = G.eco.history || [], n = p.turns || 1;
+      let run = 0; for (let k = h.length - 1; k >= 0 && h[k].unemployment < p.target; k--) run++;
+      return { done: run >= n && h.length >= n, progress: `Ahora: ${fmt.pct(G.eco.unemployment)} · ${Math.min(run, n)} de ${n} trimestres seguidos` };
+    } },
   { id: 'deuda', cat: 'economia', title: 'Cuentas saneadas',
     gen: G => ({ target: Math.max(0.25, Math.round((G.eco.debtRatio - 0.03 * gameYears(G) * RNG.range(0.8, 1.2)) * 100) / 100) }),
     text: p => `Que la deuda pública baje del ${fmt.pct(p.target, 0)} del PIB.`,
@@ -1209,10 +1241,15 @@ const MISSIONS = [
     gen: () => ({ turns: 4 }),
     text: p => `Que el país no necesite importar alimentos durante ${p.turns} trimestres seguidos.`,
     check: (G, P, p) => ({ done: G.eco.foodStreak >= p.turns, progress: `Racha actual: ${G.eco.foodStreak}` }) },
-  { id: 'tecno', cat: 'economia', title: 'País industrial',
+  // (retirada: la cuota de la industria depende de la demanda de los hogares y no hay forma de moverla; se mantiene para partidas antiguas)
+  { id: 'tecno', cat: 'economia', title: 'País industrial', valid: () => false,
     gen: G => ({ target: +(((G.eco.sectorShare.muebles || 0) + (G.eco.sectorShare.textil || 0)) * RNG.range(1.3, 1.5) + 0.01).toFixed(3) }),
     text: p => `Que la industria (muebles y textil) supere el ${fmt.pct(p.target)} del PIB.`,
     check: (G, P, p) => { const v = (G.eco.sectorShare.muebles || 0) + (G.eco.sectorShare.textil || 0); return { done: v >= p.target, progress: `Ahora: ${fmt.pct(v)}` }; } },
+  { id: 'estatal', cat: 'economia', title: 'Industria nacional',
+    gen: () => ({ target: +RNG.range(0.06, 0.09).toFixed(3) }),
+    text: p => `Que las empresas públicas (del Estado o de los cantones) den empleo al ${fmt.pct(p.target)} de los trabajadores.`,
+    check: (G, P, p) => { const s = peShare(G); return { done: s.share >= p.target, progress: `Ahora: ${fmt.pct(s.share, 1)} (${s.pe} trabajadores)` }; } },
   { id: 'salud', cat: 'bienestar', title: 'Sanidad de excelencia',
     gen: G => ({ target: Math.min(92, Math.round(G.eco.health + RNG.range(9, 13))) }),
     text: p => `Que la calidad sanitaria media llegue a ${p.target}/100.`,
@@ -1360,7 +1397,7 @@ const MISSIONS = [
     text: p => `Que la delincuencia suba por encima de ${fmt.num(p.target, 1)} delitos por cada 1.000 habitantes.`,
     check: (G, P, p) => ({ done: (G.eco.crime || 0) > p.target, progress: `Ahora: ${fmt.num(G.eco.crime || 0, 1)}` }) },
   { id: 'pisoCaro', cat: 'sombra', bad: true, title: 'Burbuja', valid: G => !!(G.eco.housing && G.eco.housing.price),
-    gen: G => ({ target: Math.round(G.eco.housing.price.piso * RNG.range(1.25, 1.35)) }),
+    gen: G => ({ target: Math.round(G.eco.housing.price.piso * RNG.range(1.08, 1.12)) }),
     text: p => `Que el precio medio de un piso supere los ${fmt.int(p.target)} mil €.`,
     check: (G, P, p) => { const v = G.eco.housing ? G.eco.housing.price.piso : 0; return { done: v > p.target, progress: `Ahora: ${fmt.int(v)} mil €` }; } },
   { id: 'desigualdad', cat: 'sombra', bad: true, title: 'Brecha',
